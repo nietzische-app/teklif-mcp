@@ -1,0 +1,349 @@
+/** Inline MCP Apps UI — max-height 500px (Claude uyumu), Mobbin tarzı kart/badge desenleri */
+export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers.html";
+
+export function buildOfferWidgetHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teklif MCP — Teklifler</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b0f14;
+      --surface: #141a22;
+      --surface-2: #1c2430;
+      --border: rgba(255,255,255,0.08);
+      --text: #f3f6fa;
+      --muted: #9aa7b8;
+      --accent: #3d8bfd;
+      --accent-soft: rgba(61,139,253,0.15);
+      --success: #22c55e;
+      --success-soft: rgba(34,197,94,0.16);
+      --warn: #f59e0b;
+      --warn-soft: rgba(245,158,11,0.16);
+      --radius: 16px;
+      --shadow: 0 8px 24px rgba(0,0,0,0.35);
+      --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f7fb;
+        --surface: #ffffff;
+        --surface-2: #f0f3f8;
+        --border: rgba(15,23,42,0.08);
+        --text: #0f172a;
+        --muted: #64748b;
+        --shadow: 0 8px 24px rgba(15,23,42,0.08);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+      background: transparent;
+      color: var(--text);
+    }
+    .shell {
+      max-height: 500px;
+      overflow: auto;
+      padding: 12px;
+      background: linear-gradient(180deg, var(--bg), transparent 120%);
+      border-radius: 18px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .brand strong { font-size: 15px; letter-spacing: -0.02em; }
+    .brand span { font-size: 12px; color: var(--muted); }
+    .pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(61,139,253,0.25);
+      white-space: nowrap;
+    }
+    .carousel {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .carousel::-webkit-scrollbar { height: 6px; }
+    .carousel::-webkit-scrollbar-thumb {
+      background: rgba(148,163,184,0.35);
+      border-radius: 999px;
+    }
+    .card {
+      flex: 0 0 220px;
+      scroll-snap-align: start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 210px;
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .emoji {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--surface-2);
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--success-soft);
+      color: var(--success);
+    }
+    .badge.warn { background: var(--warn-soft); color: var(--warn); }
+    .badge.accent { background: var(--accent-soft); color: var(--accent); }
+    .title { font-size: 14px; font-weight: 650; line-height: 1.3; letter-spacing: -0.01em; }
+    .meta { font-size: 12px; color: var(--muted); }
+    .price { font-size: 18px; font-weight: 750; letter-spacing: -0.03em; }
+    .price small { font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 4px 7px;
+    }
+    .cta {
+      margin-top: auto;
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 650;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+    .cta:hover { filter: brightness(1.05); }
+    .section-title {
+      margin: 16px 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      background: var(--surface-2);
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .best { color: var(--success); font-weight: 700; }
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+    .demo-flag {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell" id="app">
+    <div class="empty">Teklifler yükleniyor…</div>
+  </div>
+  <script>
+    const DEMO_FLAG = "Örnek veri — kurgusal demo teklifler";
+
+    function badgeClass(badge) {
+      if (!badge) return "";
+      const b = String(badge).toLowerCase();
+      if (b.includes("uygun") || b.includes("indirim")) return "";
+      if (b.includes("premium") || b.includes("popüler")) return "warn";
+      return "accent";
+    }
+
+    function formatPrice(n) {
+      try {
+        return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
+      } catch {
+        return n + " TRY";
+      }
+    }
+
+    function render(payload) {
+      const app = document.getElementById("app");
+      const offers = Array.isArray(payload?.offers) ? payload.offers : [];
+      const motto = payload?.motto || "Tekliflerinizi her yapay zeka sunsun";
+      const compare = Array.isArray(payload?.compare) ? payload.compare : offers.slice(0, 4);
+
+      if (!offers.length) {
+        app.innerHTML = '<div class="empty">Gösterilecek teklif yok. search_offers veya compare_offers çağırın.</div>';
+        return;
+      }
+
+      const cards = offers.map((o) => {
+        const badge = o.badge
+          ? '<span class="badge ' + badgeClass(o.badge) + '">' + escapeHtml(o.badge) + "</span>"
+          : "";
+        const chips = (o.highlights || []).slice(0, 3).map((h) => '<span class="chip">' + escapeHtml(h) + "</span>").join("");
+        const href = o.trackedUrl || o.baseUrl || "#";
+        return (
+          '<article class="card">' +
+            '<div class="card-top"><div class="emoji">' + (o.imageEmoji || "🎁") + "</div>" + badge + "</div>" +
+            '<div class="title">' + escapeHtml(o.title) + "</div>" +
+            '<div class="meta">' + escapeHtml(o.brand) + "</div>" +
+            '<div class="price">' + formatPrice(o.priceTry) + '<small>/ birim</small></div>' +
+            '<div class="chips">' + chips + "</div>" +
+            '<a class="cta" href="' + escapeAttr(href) + '" target="_blank" rel="noopener noreferrer">İncele</a>' +
+          "</article>"
+        );
+      }).join("");
+
+      const rows = compare.map((o, i) => {
+        const best = i === 0 || o.badge === "En uygun";
+        return (
+          "<tr>" +
+            "<td>" + escapeHtml(o.brand) + "</td>" +
+            "<td>" + escapeHtml(o.title) + "</td>" +
+            '<td class="' + (best ? "best" : "") + '">' + formatPrice(o.priceTry) + (o.badge ? " · " + escapeHtml(o.badge) : "") + "</td>" +
+            "<td>" + escapeHtml((o.highlights || []).slice(0, 2).join(" · ")) + "</td>" +
+          "</tr>"
+        );
+      }).join("");
+
+      app.innerHTML =
+        '<div class="header">' +
+          '<div class="brand"><strong>Teklif MCP</strong><span>' + escapeHtml(motto) + "</span></div>" +
+          '<div class="pill">Demo · örnek veri</div>' +
+        "</div>" +
+        '<div class="carousel">' + cards + "</div>" +
+        '<div class="section-title">Karşılaştırma</div>' +
+        "<table><thead><tr><th>Marka</th><th>Teklif</th><th>Fiyat</th><th>Öne çıkan</th></tr></thead><tbody>" +
+        rows +
+        "</tbody></table>" +
+        '<div class="demo-flag">' + DEMO_FLAG + "</div>";
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/'/g, "&#39;");
+    }
+
+    function pickStructured(msg) {
+      if (!msg) return null;
+      if (msg.structuredContent) return msg.structuredContent;
+      if (msg.params?.structuredContent) return msg.params.structuredContent;
+      if (msg.result?.structuredContent) return msg.result.structuredContent;
+      if (msg.offers) return msg;
+      return null;
+    }
+
+    // MCP Apps bridge (tool-result) + ChatGPT alias + preview bootstrap
+    window.addEventListener("message", (event) => {
+      const data = event.data;
+      if (!data) return;
+      if (data.jsonrpc === "2.0" && data.method === "ui/notifications/tool-result") {
+        const sc = pickStructured(data.params) || pickStructured(data);
+        if (sc) render(sc);
+        return;
+      }
+      if (data.type === "teklif-mcp/preview" && data.payload) {
+        render(data.payload);
+      }
+    });
+
+    // ChatGPT Apps SDK compatibility
+    try {
+      if (window.openai?.toolOutput) {
+        const sc = pickStructured(window.openai.toolOutput) || window.openai.toolOutput;
+        if (sc) render(sc);
+      }
+    } catch (_) {}
+
+    // Standalone preview.html injects window.__TEKLIF_PREVIEW__
+    if (window.__TEKLIF_PREVIEW__) {
+      render(window.__TEKLIF_PREVIEW__);
+    } else {
+      // Default demo snapshot so empty iframe isn't blank
+      render({
+        motto: "Tekliflerinizi her yapay zeka sunsun",
+        offers: [
+          { id: "rent-eco-i20", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, badge: "En uygun", highlights: ["Tam kasko", "Sınırsız km"], imageEmoji: "🚗", trackedUrl: "https://example.com/demo/anadoludrive/i20?utm_source=chatgpt&utm_medium=mcp&utm_campaign=teklif-mcp-demo&utm_content=rent-eco-i20" },
+          { id: "rent-suv-tucson", brand: "AnadoluDrive (örnek)", title: "Hyundai Tucson — SUV günlük", priceTry: 2490, badge: "Popüler", highlights: ["7 koltuk opsiyonu", "Ücretsiz ikinci sürücü"], imageEmoji: "🚙", trackedUrl: "https://example.com/demo/anadoludrive/tucson?utm_source=chatgpt&utm_medium=mcp&utm_campaign=teklif-mcp-demo&utm_content=rent-suv-tucson" },
+          { id: "shop-robot-vacuum", brand: "Nodify Market (örnek)", title: "Robot süpürge X200 — Demo", priceTry: 6499, badge: "En uygun", highlights: ["LiDAR haritalama", "Otomatik boşaltma"], imageEmoji: "🤖", trackedUrl: "https://example.com/demo/nodify/robot-x200?utm_source=chatgpt&utm_medium=mcp&utm_campaign=teklif-mcp-demo&utm_content=shop-robot-vacuum" },
+          { id: "shop-espresso", brand: "KahveKöşk (örnek)", title: "Espresso makinesi Barista Mini", priceTry: 4290, badge: "%15 indirim", highlights: ["15 bar basınç", "Süt köpürtücü"], imageEmoji: "☕", trackedUrl: "https://example.com/demo/kahvekosk/barista-mini?utm_source=chatgpt&utm_medium=mcp&utm_campaign=teklif-mcp-demo&utm_content=shop-espresso" }
+        ]
+      });
+    }
+  </script>
+</body>
+</html>`;
+}

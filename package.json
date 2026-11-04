@@ -1,0 +1,40 @@
+{
+  "name": "teklif-mcp",
+  "version": "0.1.0",
+  "description": "Teklif MCP — marka tekliflerini ChatGPT, Claude ve Gemini'ye tek MCP sunucusuyla taşıyan demo",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "preview": "npx --yes serve public -l 4173",
+    "emit-widget": "tsx scripts/emit-widget.ts",
+    "prestart": "npm run emit-widget"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "chatgpt-apps",
+    "claude-connectors",
+    "offers",
+    "teklif"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.15.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
