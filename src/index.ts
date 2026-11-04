@@ -242,6 +242,7 @@ function createServer(): McpServer {
 
 const app = express();
 app.use(express.json({ limit: "4mb" }));
+app.use(express.static(join(__dirname, "..", "public")));
 
 app.get("/health", (_req, res) => {
   res.json({
