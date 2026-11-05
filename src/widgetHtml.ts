@@ -1,5 +1,5 @@
 /** Inline MCP Apps UI — Widget v5 inspired by Dribbble Pricing Card Dark Mode (bebykurniawan), max-height 500px */
-export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v6.html";
+export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v7.html";
 
 export function buildOfferWidgetHtml(): string {
   return `<!DOCTYPE html>
@@ -74,6 +74,8 @@ export function buildOfferWidgetHtml(): string {
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
+      min-height: 120px;
+      height: auto;
       font-family: var(--font);
       background: transparent;
       color: var(--text);
@@ -408,7 +410,7 @@ export function buildOfferWidgetHtml(): string {
 
       app.innerHTML =
         '<div class="hdr">' +
-          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v6</div>' +
+          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v7</div>' +
           '<div class="title">' + escapeHtml(motto) + ' <span>/ örnek</span></div></div>' +
           '<div class="seg">' + segs + "</div>" +
         "</div>" +
@@ -445,10 +447,13 @@ export function buildOfferWidgetHtml(): string {
     }
 
     // ---- MCP Apps bridge (SEP-1865, protocol 2026-01-26) ----
-    let sameOriginParent = false;
-    try { sameOriginParent = window.parent !== window && !!window.parent.location.href; } catch (_) {}
-    // Real MCP Apps hosts sandbox us cross-origin; same-origin parent = our /preview page
-    const inHost = window.parent && window.parent !== window && !sameOriginParent;
+    // Preview = served from our own /widget page (top-level or iframed by /preview).
+    // Hosts (Claude: nested *.claudemcpcontent.com iframes, ChatGPT) load the ui:// resource
+    // via srcdoc/blob/sandbox URL, so pathname never matches. Do NOT use same-origin checks:
+    // Claude's outer and inner sandbox iframes share an origin.
+    const pn = String(location.pathname || "");
+    const isPreview = pn === "/widget" || pn.endsWith("/widget.html") || pn.endsWith("/widget-standalone.html") || !!window.__TEKLIF_PREVIEW__;
+    const inHost = !isPreview && window.parent && window.parent !== window;
     let rpcId = 1;
     const pending = {};
     function post(msg) { try { window.parent.postMessage(msg, "*"); } catch (_) {} }
@@ -459,7 +464,7 @@ export function buildOfferWidgetHtml(): string {
     }
     function notify(method, params) { post({ jsonrpc: "2.0", method, params }); }
     let rendered = false;
-    function show(sc) { if (sc) { rendered = true; render(sc); reportSize(); } }
+    function show(sc) { if (sc) { rendered = true; render(sc); lastH = 0; reportSize(); } }
 
     window.addEventListener("message", (event) => {
       const data = event.data;
@@ -467,6 +472,11 @@ export function buildOfferWidgetHtml(): string {
       if (data.jsonrpc === "2.0" && data.id != null && pending[data.id] && !data.method) {
         const r = pending[data.id]; delete pending[data.id]; r(data.result ?? null); return;
       }
+      if (data.jsonrpc === "2.0" && data.method === "ui/notifications/tool-input") {
+        if (!rendered) document.getElementById("app").innerHTML = '<div class="empty">teklifler aranıyor…</div>';
+        reportSize(); return;
+      }
+      if (data.jsonrpc === "2.0" && data.method === "ui/notifications/host-context-changed") return;
       if (data.jsonrpc === "2.0" && data.method === "ui/notifications/tool-result") {
         show(pickStructured(data.params) || pickStructured(data)); return;
       }
@@ -476,12 +486,19 @@ export function buildOfferWidgetHtml(): string {
       if (data.type === "teklif-mcp/preview" && data.payload) show(data.payload);
     });
 
+    let lastH = 0;
     function reportSize() {
       if (!inHost) return;
-      const el = document.documentElement;
-      notify("ui/notifications/size-changed", { width: Math.ceil(el.scrollWidth), height: Math.ceil(el.scrollHeight) });
+      requestAnimationFrame(() => {
+        const app = document.getElementById("app");
+        const h = Math.ceil(Math.max(app ? app.getBoundingClientRect().height : 0, document.body.scrollHeight, document.documentElement.scrollHeight, 120));
+        const w = Math.ceil(document.documentElement.scrollWidth);
+        if (h === lastH) return;
+        lastH = h;
+        notify("ui/notifications/size-changed", { width: w, height: h });
+      });
     }
-    try { new ResizeObserver(reportSize).observe(document.body); } catch (_) {}
+    try { const ro = new ResizeObserver(reportSize); ro.observe(document.body); ro.observe(document.getElementById("app")); } catch (_) {}
 
     // Links: ask host to open (sandboxed iframes may block target=_blank)
     document.addEventListener("click", (e) => {
@@ -504,11 +521,17 @@ export function buildOfferWidgetHtml(): string {
     } else if (inHost) {
       document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
       request("ui/initialize", {
-        appInfo: { name: "teklif-mcp-widget", version: "6.0.0" },
-        clientInfo: { name: "teklif-mcp-widget", version: "6.0.0" },
+        appInfo: { name: "teklif-mcp-widget", version: "7.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "7.0.0" },
         appCapabilities: { availableDisplayModes: ["inline"] },
         protocolVersion: "2026-01-26"
-      }).then(() => { notify("ui/notifications/initialized", {}); reportSize(); });
+      }).then((res) => {
+        notify("ui/notifications/initialized", {});
+        lastH = 0; reportSize();
+        // Some hosts include the latest tool result in context; tool-result notification is canonical.
+        const sc = res && res.hostContext && pickStructured(res.hostContext.toolResult);
+        if (sc && !rendered) show(sc);
+      });
     } else {
       show({
         motto: "Tekliflerinizi her yapay zeka sunsun",
