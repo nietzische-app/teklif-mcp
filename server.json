@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.nietzische-app/teklif-mcp",
   "title": "Teklif",
-  "description": "Search and compare offers for car rental, e-commerce and car insurance in Turkey — clearly labeled sample data, no paid ranking.",
+  "description": "Search and compare operator-owned Aegis Scanner security plans — no paid ranking; read-only MCP.",
   "websiteUrl": "https://teklif.niyazi.site",
   "repository": {
     "url": "https://github.com/nietzische-app/teklif-mcp",
     "source": "github"
   },
-  "version": "0.3.0",
+  "version": "0.4.0",
   "remotes": [
     {
       "type": "streamable-http",

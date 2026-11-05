@@ -191,6 +191,16 @@ export function buildOfferWidgetHtml(): string {
       }
     }
 
+    function priceUnit(o) {
+      const u = o.priceUnit;
+      if (u === "per_month") return "/ay";
+      if (u === "per_apk") return "/APK";
+      if (u === "from_one_time") return "+";
+      if (u === "one_time") return " bir kerelik";
+      if (o.badge && String(o.badge).startsWith("/")) return String(o.badge);
+      return "";
+    }
+
     function savePct(o) {
       if (o.wasPriceTry != null && o.priceTry != null && o.wasPriceTry > o.priceTry) {
         return Math.round(((o.wasPriceTry - o.priceTry) / o.wasPriceTry) * 100);
@@ -201,14 +211,14 @@ export function buildOfferWidgetHtml(): string {
     function featLines(o) {
       const pct = savePct(o);
       const lines = [];
-      lines.push(o.brand + " · örnek veri");
-      lines.push("Source: " + (o.source || "Sample data"));
+      lines.push(o.brand);
+      lines.push("Source: " + (o.source || "aegisscanner.com pricing (operator-owned)"));
       if (o.rating != null) lines.push("Puan " + Number(o.rating).toFixed(1) + " / 5");
       if (pct != null) lines.push("%" + pct + " vs previous price");
       return lines.slice(0, 4);
     }
 
-    const CAT_LABEL = { arac_kiralama: "Araç kiralama", e_ticaret: "E-ticaret", kasko: "Kasko", trafik_sigortasi: "Trafik sigortası" };
+    const CAT_LABEL = { one_time: "One-time", monthly: "Monthly", addon: "Add-on" };
     function render(payload) {
       const app = document.getElementById("app");
       const offers = Array.isArray(payload?.offers) ? payload.offers : [];
@@ -223,8 +233,8 @@ export function buildOfferWidgetHtml(): string {
       const cardLimit = isCompare ? 5 : 4;
       const cards = offers.slice(0, cardLimit).map((o) => {
         const pct = savePct(o);
-        const badge = o.badge && /^-?\d+%$/.test(String(o.badge).trim()) ? String(o.badge).trim() : null;
-        const pillText = badge || (pct != null ? "-" + pct + "%" : "TEKLİF");
+        const rawBadge = o.badge != null ? String(o.badge).trim() : "";
+        const pillText = rawBadge || (pct != null ? "-" + pct + "%" : (o.priceUnit === "per_month" ? "/mo" : "TEKLİF"));
         const href = o.offerUrl || o.trackedUrl || o.baseUrl || "#";
         const feats = featLines(o).map((f) => "<li>" + escapeHtml(f) + "</li>").join("");
         return (
@@ -232,7 +242,7 @@ export function buildOfferWidgetHtml(): string {
             '<div class="hero">' +
               '<span class="pill">' + escapeHtml(pillText) + "</span>" +
               '<div class="price-row">' +
-                '<div class="price">' + formatPrice(o.priceTry) + "<small>/teklif</small></div>" +
+                '<div class="price">' + formatPrice(o.priceTry) + "<small>" + priceUnit(o) + "</small></div>" +
                 (o.wasPriceTry != null ? '<div class="was">' + formatPrice(o.wasPriceTry) + "</div>" : "") +
               "</div>" +
             "</div>" +
@@ -354,16 +364,16 @@ export function buildOfferWidgetHtml(): string {
       });
     } else {
       const demoOffers = [
-        { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", rating: 4.6, highlights: ["Yetkili servis", "İkame araç 15 gün"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ist-genis", trackedUrl: "https://teklif.niyazi.site/o/kasko-ist-genis" },
-        { id: "kasko-ist-ekonomik", city: "İstanbul", category: "kasko", brand: "Martı Güvence (örnek)", title: "Dar Kasko — Ekonomik paket", priceTry: 11450, wasPriceTry: 13200, badge: "-13%", rating: 4.3, highlights: ["Anlaşmalı servis", "12 taksit"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ist-ekonomik", trackedUrl: "https://teklif.niyazi.site/o/kasko-ist-ekonomik" },
-        { id: "kasko-ank-tam", city: "Ankara", category: "kasko", brand: "Başkent Teminat (örnek)", title: "Tam Kasko — Hasarsızlık korumalı", priceTry: 16750, wasPriceTry: 19900, badge: "-16%", rating: 4.7, highlights: ["Hasarsızlık koruma", "Cam hasarı"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ank-tam", trackedUrl: "https://teklif.niyazi.site/o/kasko-ank-tam" },
-        { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", rating: 4.8, highlights: ["Tam kasko", "Sınırsız km"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/rent-eco-i20", trackedUrl: "https://teklif.niyazi.site/o/rent-eco-i20" }
+        { id: "aegis-growth", city: "Türkiye", category: "monthly", brand: "Aegis Scanner", title: "Growth — Aylık İzleme", priceTry: 2990, priceUnit: "per_month", badge: "/mo", highlights: ["3 hedef domain + sınırsız subdomain", "Haftalık otomatik tarama + diff raporu"], source: "aegisscanner.com pricing (operator-owned)", offerUrl: "https://aegisscanner.com/landing#pricing", trackedUrl: "https://aegisscanner.com/landing#pricing" },
+        { id: "aegis-starter", city: "Türkiye", category: "one_time", brand: "Aegis Scanner", title: "Starter — KOBİ tek-seferlik denetim", priceTry: 7990, priceUnit: "one_time", badge: "one-time", highlights: ["1 ana domain + alt-domain keşfi (max 5)", "Pasif tarama: TLS, DNS, e-posta auth, CVE, KVKK şeffaflık"], source: "aegisscanner.com pricing (operator-owned)", offerUrl: "https://aegisscanner.com/landing#pricing", trackedUrl: "https://aegisscanner.com/landing#pricing" },
+        { id: "aegis-monthly-pro", city: "Türkiye", category: "monthly", brand: "Aegis Scanner", title: "Aylık Pro", priceTry: 6990, priceUnit: "per_month", badge: "/mo", highlights: ["5 domain", "Günlük tarama"], source: "aegisscanner.com pricing (operator-owned)", offerUrl: "https://aegisscanner.com/landing#pricing", trackedUrl: "https://aegisscanner.com/landing#pricing" },
+        { id: "aegis-enterprise", city: "Türkiye", category: "one_time", brand: "Aegis Scanner", title: "Enterprise — özel teklif", priceTry: 19990, priceUnit: "from_one_time", badge: "from", highlights: ["Aktif pentest (Mod 2)", "7/24 SLA"], source: "aegisscanner.com pricing (operator-owned)", offerUrl: "https://aegisscanner.com/landing#pricing", trackedUrl: "https://aegisscanner.com/landing#pricing" }
       ];
       let view = "search";
       try { view = new URLSearchParams(location.search).get("view") === "compare" ? "compare" : "search"; } catch (_) {}
       const list = view === "compare" ? demoOffers.slice(0, 5) : demoOffers.slice(0, 4);
       show({
-        isDemo: true,
+        isDemo: false,
         sortedBy: "price",
         view,
         offers: list

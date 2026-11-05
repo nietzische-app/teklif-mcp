@@ -1,18 +1,20 @@
 # Teklif MCP
 
-Neutral, user-initiated **offer search and comparison** for car rental, e-commerce, comprehensive car insurance (kasko) and compulsory traffic insurance in Turkey — exposed as a remote MCP server with an interactive card widget.
+Neutral, user-initiated **offer search and comparison** exposed as a remote MCP server with an interactive card widget.
 
 > Website motto (site only, not in tool outputs): *Tekliflerinizi her yapay zeka sunsun*
 
-**All offers are clearly labeled fictional sample data.** No booking, purchase or payment is made through Teklif. There is no paid ranking, sponsored placement or affiliate tracking.
+**Current catalog:** operator-owned [Aegis Scanner](https://aegisscanner.com/landing#pricing) security plans (source field = `aegisscanner.com pricing (operator-owned)`). Teklif does **not** take payment or book anything; links open the provider site. There is **no paid ranking**, sponsored placement or affiliate tracking.
+
+**Operator model:** Teklif is run by the operator (agency). Today it surfaces the operator’s own product plans. The same connector pattern is intended later as a service offered to other companies — still without paid ranking unless that is explicitly disclosed.
 
 ## What it does
 
 - TypeScript **remote MCP** server (`@modelcontextprotocol/sdk`, Streamable HTTP)
 - Tools: `search_offers`, `compare_offers`, `get_offer_link`
-- MCP Apps UI: `ui://teklif-mcp/offers-v11.html` (`text/html;profile=mcp-app`) — offer card carousel
-- Sort options: `price` (default, lowest first), `rating`, `relevance` — transparent, no paid placement
-- Every offer includes a `source` field (currently `"Sample data"`)
+- MCP Apps UI: `ui://teklif-mcp/offers-v11.html` — offer card carousel
+- Sort options: `price` (default), `rating`, `relevance` — transparent, no paid placement
+- Every offer includes a `source` field
 
 Live: `https://teklif.niyazi.site` · MCP: `POST https://teklif.niyazi.site/mcp`
 
@@ -22,18 +24,18 @@ Live: `https://teklif.niyazi.site` · MCP: `POST https://teklif.niyazi.site/mcp`
 | --- | --- | --- |
 | `search_offers` | `category`, `budget?`, `city?`, `sort_by?` | Matching offers + card UI |
 | `compare_offers` | `offer_ids?`, `category?`, `city?`, `sort_by?` | Side-by-side compare + card UI |
-| `get_offer_link` | `offer_id` | Provider page URL on teklif.niyazi.site |
+| `get_offer_link` | `offer_id` | Provider page URL on aegisscanner.com |
 
-Categories: `arac_kiralama` (car rental), `e_ticaret` (e-commerce), `kasko`, `trafik_sigortasi`, `hepsi` (all).
+Categories: `one_time`, `monthly`, `addon`, `hepsi` (all).
 
-Annotations: `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: false` (embedded sample data).
+Annotations: `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: false` (embedded operator catalog).
 
 ## Example prompts
 
-1. Find car rental offers in İstanbul under 3000 TL.
-2. Compare kasko (comprehensive car insurance) offers in Ankara.
-3. Show me traffic insurance offers in İstanbul and compare the two cheapest.
-4. Get the link for the offer rent-eco-i20.
+1. Show Aegis Scanner monthly plans under 10000 TL.
+2. Compare one-time Aegis offers.
+3. Get the link for aegis-starter.
+4. List all Aegis Scanner offers sorted by price.
 
 ## Setup
 
@@ -46,22 +48,12 @@ npm start
 # Preview: http://127.0.0.1:8787/preview
 ```
 
-Development:
-
-```bash
-npm run dev
-npx tsx scripts/emit-widget.ts   # regenerate public/widget*.html
-```
-
-Env: `PUBLIC_MCP_URL` (production default `https://teklif.niyazi.site/mcp`) — used for Claude UI domain hashing.
+Env: `PUBLIC_MCP_URL` (production `https://teklif.niyazi.site/mcp`).
 
 ## Connect in Claude / ChatGPT
 
 1. Add `https://teklif.niyazi.site/mcp` as a custom connector (no auth).
-2. Streamable HTTP transport.
-3. Call `search_offers` — the card widget renders via `_meta.ui.resourceUri`.
-
-Docs: [Claude connectors submission](https://claude.com/docs/connectors/building/submission) · [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) · [OpenAI apps](https://openai.com/index/developers-can-now-submit-apps-to-chatgpt/)
+2. Streamable HTTP · call `search_offers`.
 
 ## Privacy & terms
 
@@ -72,16 +64,15 @@ Docs: [Claude connectors submission](https://claude.com/docs/connectors/building
 
 | Symptom | What to try |
 | --- | --- |
-| `tools/list` empty / 405 on GET `/mcp` | Use **POST** `/mcp` (Streamable HTTP). |
-| Widget blank in Claude | Confirm `PUBLIC_MCP_URL=https://teklif.niyazi.site/mcp` on the deployment; Claude hashes this for `ui.domain`. |
-| Offer not found | Call `search_offers` first and use an `id` from the result. |
-| Unexpected order | Pass `sort_by`: `price` \| `rating` \| `relevance`. Response includes `sortedBy` and `sortNote`. |
+| `tools/list` empty / 405 on GET `/mcp` | Use **POST** `/mcp`. |
+| Widget blank in Claude | Confirm `PUBLIC_MCP_URL=https://teklif.niyazi.site/mcp`. |
+| Offer not found | Call `search_offers` first; use an `id` like `aegis-growth`. |
 
 ## Support
 
 GitHub: [nietzische-app/teklif-mcp](https://github.com/nietzische-app/teklif-mcp)
 
-> Support email: **[PLACEHOLDER — unknown; add a verified contact before directory submission]**
+> Support email: **[PLACEHOLDER — pending; personal address may be used later]**
 
 ## License
 

@@ -66,7 +66,7 @@ function resultUiMeta() {
 }
 
 const categorySchema = z
-  .enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"])
+  .enum(["one_time", "monthly", "addon", "hepsi"])
   .default("hepsi");
 
 const sortBySchema = z.enum(["price", "rating", "relevance"]).default("price");
@@ -123,8 +123,8 @@ function serializeOffers(offers: Offer[]) {
     category: o.category,
     city: o.city,
     priceTry: o.priceTry,
-    wasPriceTry: o.wasPriceTry ?? null,
-    priceLabel: formatPrice(o.priceTry),
+    priceUnit: o.priceUnit,
+    priceLabel: formatPrice(o.priceTry, o.priceUnit),
     badge: o.badge ?? null,
     rating: o.rating ?? null,
     highlights: o.highlights,
@@ -132,7 +132,7 @@ function serializeOffers(offers: Offer[]) {
     heroFrom: o.heroFrom ?? null,
     heroTo: o.heroTo ?? null,
     source: o.source ?? OFFER_SOURCE,
-    isDemo: true as const,
+    isDemo: false as const,
     baseUrl: o.baseUrl,
     offerUrl: offerPageUrl(o.baseUrl),
     // Widget compat alias (no tracking params)
@@ -152,7 +152,7 @@ function textSummary(offers: Offer[], sortBy: SortBy = "price"): string {
   }
   const lines = offers.map(
     (o, i) =>
-      `${i + 1}. ${o.brand} — ${o.title} [${o.city}]: ${formatPrice(o.priceTry)}` +
+      `${i + 1}. ${o.brand} — ${o.title} [${o.city}]: ${formatPrice(o.priceTry, o.priceUnit)}` +
       (o.rating != null ? ` · ★${o.rating}` : "") +
       (o.badge ? ` · ${o.badge}` : "") +
       ` · source: ${o.source ?? OFFER_SOURCE} (${o.id})`
@@ -164,7 +164,7 @@ function createServer(): McpServer {
   const server = new McpServer(
     {
       name: "teklif-mcp",
-      version: "0.3.0",
+      version: "0.4.0",
     },
     {
       capabilities: {
@@ -199,13 +199,13 @@ function createServer(): McpServer {
               ...(process.env.UI_DOMAIN_OFF || chatgpt ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
             "openai/widgetPrefersBorder": true,
-            "openai/widgetDescription": "Sample offer cards (dark, cards-only)",
+            "openai/widgetDescription": "Aegis Scanner offer cards (dark, cards-only)",
             "openai/ui": { availableDisplayModes: ["inline"] },
             "openai/widgetCSP": {
               connect_domains: [],
               resource_domains: [],
               frame_domains: [],
-              redirect_domains: ["https://teklif.niyazi.site"],
+              redirect_domains: ["https://aegisscanner.com", "https://teklif.niyazi.site"],
             },
           },
         },
@@ -219,11 +219,11 @@ function createServer(): McpServer {
     {
       title: "Search offers",
       description:
-        "Searches offers when the user asks for them, filtered by category (arac_kiralama = car rental, e_ticaret = e-commerce, kasko = comprehensive car insurance, trafik_sigortasi = compulsory traffic insurance, or hepsi = all), optional city and optional maximum price in TRY. Returns matching offers sorted by sort_by (price | rating | relevance; default price, lowest first) and shows them as cards. No paid or sponsored ranking. Currently returns fictional sample data labeled as such.",
+        "Searches offers when the user asks for them, filtered by category (one_time, monthly, addon, or hepsi = all), optional city and optional maximum price in TRY. Returns matching offers sorted by sort_by (price | rating | relevance; default price, lowest first) and shows them as cards. No paid or sponsored ranking. Currently returns operator-owned Aegis Scanner plans from aegisscanner.com/landing#pricing.",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         category: categorySchema.describe(
-          "arac_kiralama (car rental) | e_ticaret (e-commerce) | kasko | trafik_sigortasi | hepsi (all)"
+          "one_time | monthly | addon | hepsi (all)"
         ),
         budget: z
           .number()
@@ -247,7 +247,7 @@ function createServer(): McpServer {
       const serialized = serializeOffers(offers);
       const structuredContent = {
         disclaimer: DEMO_DISCLAIMER,
-        isDemo: true,
+        isDemo: false,
         view: "search" as const,
         category: category ?? "hepsi",
         budget: budget ?? null,
@@ -269,7 +269,7 @@ function createServer(): McpServer {
     {
       title: "Compare offers",
       description:
-        "Compares offers the user has explicitly asked to compare (by offer IDs from search_offers, or by category/city). If no IDs are given, returns up to 5 matching offers sorted by sort_by (default: the 5 lowest-priced). Returns offers with a card view. No paid or sponsored ranking. Sample data only.",
+        "Compares offers the user has explicitly asked to compare (by offer IDs from search_offers, or by category/city). If no IDs are given, returns up to 5 matching offers sorted by sort_by (default: the 5 lowest-priced). Returns offers with a card view. No paid or sponsored ranking. Operator-owned Aegis Scanner pricing.",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         offer_ids: z
@@ -299,7 +299,7 @@ function createServer(): McpServer {
       const serialized = serializeOffers(offers);
       const structuredContent = {
         disclaimer: DEMO_DISCLAIMER,
-        isDemo: true,
+        isDemo: false,
         view: "compare" as const,
         category: category ?? "hepsi",
         city: city ?? null,
@@ -328,10 +328,10 @@ function createServer(): McpServer {
     {
       title: "Get offer link",
       description:
-        "Returns the provider page URL for a single offer ID from search_offers. Read-only; does not book or purchase. Currently sample links on teklif.niyazi.site.",
+        "Returns the provider page URL for a single offer ID from search_offers. Read-only; does not book or purchase. Links point to aegisscanner.com (operator-owned).",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
-        offer_id: z.string().describe("Offer id, e.g. rent-eco-i20 or kasko-ist-genis"),
+        offer_id: z.string().describe("Offer id, e.g. aegis-starter or aegis-growth"),
       },
     },
     async ({ offer_id }) => {
@@ -350,7 +350,7 @@ function createServer(): McpServer {
       const url = offerPageUrl(offer.baseUrl);
       const structuredContent = {
         disclaimer: DEMO_DISCLAIMER,
-        isDemo: true,
+        isDemo: false,
         offer_id: offer.id,
         category: offer.category,
         city: offer.city,
@@ -380,7 +380,8 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     name: "teklif-mcp",
-    demo: true,
+    operatorOwned: true,
+    source: "aegisscanner.com pricing",
     publicMcpUrl: PUBLIC_MCP_URL,
   });
 });
@@ -400,34 +401,20 @@ app.get("/", (_req, res) => {
 <body>
 <h1>Teklif</h1>
 <p><em>${SITE_MOTTO}</em></p>
-<p>Neutral, user-initiated offer search and comparison for car rental, e-commerce and car insurance in Turkey. Currently uses clearly labeled sample data.</p>
+<p>Neutral, user-initiated offer search and comparison. Currently lists operator-owned Aegis Scanner security plans from aegisscanner.com. No paid ranking; Teklif does not process payments.</p>
 <p class="muted">MCP endpoint: <code>POST /mcp</code> · <a href="/preview">Widget preview</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></p>
 </body></html>`);
 });
 
-/** Sample offer landing pages (owned domain; replaces example.com). */
+/** Convenience redirect to the provider offer page (aegisscanner.com). */
 app.get("/o/:id", (req, res) => {
   const offer = OFFERS.find((o) => o.id === req.params.id);
   if (!offer) {
     res.status(404).type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Not found</title></head>
-<body><p>Sample offer not found: ${String(req.params.id)}</p><p><a href="/">Home</a></p></body></html>`);
+<body><p>Offer not found: ${String(req.params.id)}</p><p><a href="/">Home</a></p></body></html>`);
     return;
   }
-  res.type("html").send(`<!DOCTYPE html>
-<html lang="tr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>${offer.brand} — ${offer.title} (sample)</title>
-<style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:2rem auto;padding:0 1.25rem;line-height:1.55}
-.badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;background:#eee;font-size:.85rem}
-.muted{opacity:.75;font-size:.9rem}</style></head>
-<body>
-<p class="muted"><a href="/">Teklif</a> · sample offer page</p>
-<h1>${offer.brand}</h1>
-<p>${offer.title}</p>
-<p><strong>${formatPrice(offer.priceTry)}</strong>${offer.badge ? ` <span class="badge">${offer.badge}</span>` : ""} · ${offer.city}</p>
-<p>Source: <strong>${offer.source}</strong> (fictional demo — no booking or purchase).</p>
-<ul>${offer.highlights.map((h) => `<li>${h}</li>`).join("")}</ul>
-<p class="muted">Id: <code>${offer.id}</code></p>
-</body></html>`);
+  res.redirect(302, offer.baseUrl);
 });
 
 app.get("/preview", (_req, res) => {
