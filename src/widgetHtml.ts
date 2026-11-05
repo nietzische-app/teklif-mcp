@@ -1,5 +1,5 @@
-/** Inline MCP Apps UI — Widget v10: cards-only (no compare table), forced dark theme */
-export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v10.html";
+/** Inline MCP Apps UI — Widget v11: transparent host bg, offer cards only (no chrome) */
+export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v11.html";
 
 export function buildOfferWidgetHtml(): string {
   return `<!DOCTYPE html>
@@ -10,23 +10,18 @@ export function buildOfferWidgetHtml(): string {
   <title>Teklif MCP — Offers</title>
   <style>
     :root {
-      /* Always dark — ignore host / OS prefers-color-scheme (ChatGPT light theme was flipping this). */
-      color-scheme: only dark;
-      --bg: #060607;
-      --bg-elev: #0E0E10;
+      /* Cards stay self-contained dark so they stay legible on light OR dark host chats. */
+      color-scheme: light dark;
       --card: #141416;
-      --card-border: rgba(239, 240, 246, 0.08);
+      --card-border: rgba(255, 255, 255, 0.10);
       --text: #EFF0F6;
       --muted: #BCBEDA;
-      --faint: #7A7C96;
+      --faint: #9A9CB8;
       --accent-a: #6462F3;
       --accent-b: #C95CE1;
       --accent-c: #7AA1E2;
       --cta: #FFFFFF;
       --cta-ink: #0A0A0C;
-      --ok: #8BE0A0;
-      --danger: #FF6B7A;
-      --radius-shell: 20px;
       --radius-card: 18px;
       --radius-pill: 999px;
       --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -42,75 +37,35 @@ export function buildOfferWidgetHtml(): string {
                 radial-gradient(100% 80% at 80% 40%, #6462F3 0%, transparent 55%),
                 radial-gradient(90% 100% at 60% 100%, #C95CE1 0%, transparent 50%),
                 linear-gradient(170deg, #101828 0%, #0c0c14 100%);
-      --spot: radial-gradient(ellipse 70% 45% at 50% -10%, rgba(239,240,246,0.14), transparent 60%);
-      --glow: 0 0 0 1px rgba(239,240,246,0.12), 0 8px 28px rgba(100,98,243,0.18), 0 2px 10px rgba(255,255,255,0.18);
+      --glow: 0 0 0 1px rgba(255,255,255,0.14), 0 8px 28px rgba(100,98,243,0.22), 0 2px 10px rgba(0,0,0,0.18);
     }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
       height: auto;
       font-family: var(--font);
-      background: #060607;
+      background: transparent !important;
       color: var(--text);
-      color-scheme: only dark;
       -webkit-font-smoothing: antialiased;
     }
+    /* No outer shell chrome — just the card rail floating on the host chat bg */
     .shell {
       width: 100%;
       max-width: 720px;
+      margin: 0;
+      padding: 0;
       overflow: visible;
-      display: flex;
-      flex-direction: column;
-      background:
-        var(--spot),
-        radial-gradient(circle at 1px 1px, rgba(188,190,218,0.12) 1px, transparent 0) 0 0 / 14px 14px,
-        var(--bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-shell);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      background: transparent;
+      border: 0;
+      box-shadow: none;
     }
-    /* —— HEADER —— */
-    .hdr {
-      flex: 0 0 auto;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 12px 14px 8px;
-    }
-    .brand-block { min-width: 0; }
-    .eyebrow {
-      font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
-    }
-    .title {
-      font-size: 15px; font-weight: 650; letter-spacing: -0.02em;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .title span { color: var(--faint); font-weight: 500; }
-    .seg {
-      display: inline-flex; gap: 4px; padding: 3px;
-      background: rgba(62,62,65,0.45);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-pill);
-      flex: 0 0 auto;
-    }
-    .seg button {
-      appearance: none; border: 0; cursor: default;
-      background: transparent; color: var(--muted);
-      font-family: var(--font); font-size: 10px; font-weight: 600;
-      letter-spacing: 0.02em; padding: 5px 10px;
-      border-radius: var(--radius-pill);
-    }
-    .seg button.active {
-      background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(100,98,243,0.35);
-    }
-    /* —— CARDS —— */
     .rail {
-      flex: 0 0 auto;
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 10px;
-      padding: 4px 12px 8px;
+      padding: 0;
+      margin: 0;
+      width: 100%;
     }
     .card {
       display: flex; flex-direction: column;
@@ -119,7 +74,10 @@ export function buildOfferWidgetHtml(): string {
       border-radius: var(--radius-card);
       overflow: hidden;
       min-width: 0;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+      box-shadow:
+        0 1px 2px rgba(0,0,0,0.12),
+        0 12px 28px rgba(0,0,0,0.22),
+        0 0 0 1px rgba(0,0,0,0.04);
     }
     .hero {
       position: relative;
@@ -136,10 +94,11 @@ export function buildOfferWidgetHtml(): string {
     }
     .card:nth-child(2) .hero::before { background: var(--mesh-2); }
     .card:nth-child(3) .hero::before { background: var(--mesh-3); }
+    .card:nth-child(4) .hero::before { background: var(--mesh-1); }
+    .card:nth-child(5) .hero::before { background: var(--mesh-2); }
     .hero::after {
       content: ""; position: absolute; inset: 0; z-index: -1;
       background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 40%, rgba(0,0,0,0.25));
-      backdrop-filter: blur(0.5px);
     }
     .pill {
       align-self: flex-start;
@@ -174,6 +133,7 @@ export function buildOfferWidgetHtml(): string {
     .body {
       padding: 10px 12px 12px;
       display: flex; flex-direction: column; gap: 8px; flex: 1;
+      background: var(--card);
     }
     .subtitle {
       font-size: 11px; color: var(--muted); line-height: 1.35;
@@ -211,40 +171,10 @@ export function buildOfferWidgetHtml(): string {
       font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--faint);
     }
-    /* —— FOOTER CTA —— */
-    .cta-bar {
-      flex: 0 0 auto;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 10px 14px 12px;
-    }
-    .cta-copy { min-width: 0; }
-    .cta-copy strong {
-      display: block; font-size: 12px; font-weight: 650; letter-spacing: -0.01em;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .cta-copy span { font-size: 10px; color: var(--muted); }
-    .cta-btn {
-      appearance: none; border: 0; cursor: pointer; text-decoration: none;
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 9px 16px; border-radius: var(--radius-pill);
-      background: var(--cta); color: var(--cta-ink);
-      font-family: var(--font); font-size: 11px; font-weight: 700;
-      box-shadow: var(--glow);
-      white-space: nowrap;
-    }
-    .cta-btn:hover { filter: brightness(1.05); }
-
-    /* compare_offers uses the same cards-only layout; pill marks the view */
-    .view-pill {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 3px 9px; border-radius: var(--radius-pill);
-      font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-      background: rgba(100,98,243,0.22); color: #D6D5FF;
-      border: 1px solid rgba(100,98,243,0.35);
-    }
     .empty {
-      padding: 36px 16px; text-align: center;
-      font-size: 12px; color: var(--muted);
+      padding: 24px 12px; text-align: center;
+      font-size: 12px; color: #7A7C96;
+      background: transparent;
     }
   </style>
 </head>
@@ -253,8 +183,6 @@ export function buildOfferWidgetHtml(): string {
     <div class="empty">teklifler yükleniyor…</div>
   </div>
   <script>
-    const PLATFORMS = ["ALL", "ChatGPT", "Claude", "Gemini"];
-
     function formatPrice(n) {
       try {
         return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -285,8 +213,6 @@ export function buildOfferWidgetHtml(): string {
     function render(payload) {
       const app = document.getElementById("app");
       const offers = Array.isArray(payload?.offers) ? payload.offers : [];
-      const motto = payload?.motto || "Tekliflerinizi her yapay zeka sunsun";
-      const activePlatform = payload?.platform || "ALL";
       const view = String(payload?.view || "search").toLowerCase() === "compare" ? "compare" : "search";
       const isCompare = view === "compare";
 
@@ -294,14 +220,6 @@ export function buildOfferWidgetHtml(): string {
         app.innerHTML = '<div class="empty">teklif yok — search_offers | compare_offers</div>';
         return;
       }
-
-      const segs = PLATFORMS.map((p) => {
-        const ap = String(activePlatform).toLowerCase();
-        const active =
-          p.toLowerCase() === ap ||
-          (p === "ALL" && !["chatgpt", "claude", "gemini"].includes(ap));
-        return '<button type="button" class="' + (active ? "active" : "") + '">' + p + "</button>";
-      }).join("");
 
       const cardLimit = isCompare ? 5 : 4;
       const cards = offers.slice(0, cardLimit).map((o) => {
@@ -330,22 +248,8 @@ export function buildOfferWidgetHtml(): string {
         );
       }).join("");
 
-      const eyebrow = isCompare
-        ? '<div class="eyebrow">Teklif MCP · v10 <span class="view-pill">compare</span></div>'
-        : '<div class="eyebrow">Teklif MCP · v10</div>';
-
       app.className = "shell";
-      app.innerHTML =
-        '<div class="hdr">' +
-          '<div class="brand-block">' + eyebrow +
-          '<div class="title">' + escapeHtml(isCompare ? "Teklifleri karşılaştır" : motto) + ' <span>/ örnek</span></div></div>' +
-          '<div class="seg">' + segs + "</div>" +
-        "</div>" +
-        '<div class="rail">' + cards + "</div>" +
-        '<div class="cta-bar">' +
-          '<div class="cta-copy"><strong>Her yapay zekada aynı teklifler</strong><span>ChatGPT · Claude · Gemini — tek MCP</span></div>' +
-          '<a class="cta-btn" href="https://example.com/demo/teklif-mcp/connect" target="_blank" rel="noopener noreferrer">MCP bağla</a>' +
-        "</div>";
+      app.innerHTML = '<div class="rail">' + cards + "</div>";
     }
 
     function escapeHtml(s) {
@@ -369,10 +273,6 @@ export function buildOfferWidgetHtml(): string {
     }
 
     // ---- MCP Apps bridge (SEP-1865, protocol 2026-01-26) ----
-    // Preview = served from our own /widget page (top-level or iframed by /preview).
-    // Hosts (Claude: nested *.claudemcpcontent.com iframes, ChatGPT) load the ui:// resource
-    // via srcdoc/blob/sandbox URL, so pathname never matches. Do NOT use same-origin checks:
-    // Claude's outer and inner sandbox iframes share an origin.
     const pn = String(location.pathname || "");
     const isPreview = pn === "/widget" || pn.endsWith("/widget.html") || pn.endsWith("/widget-standalone.html") || !!window.__TEKLIF_PREVIEW__;
     const inHost = !isPreview && window.parent && window.parent !== window;
@@ -413,7 +313,6 @@ export function buildOfferWidgetHtml(): string {
       if (!inHost && !window.openai) return;
       requestAnimationFrame(() => {
         const app = document.getElementById("app");
-        // Measure content, not the viewport (scrollHeight never shrinks below iframe height)
         const r = app ? app.getBoundingClientRect() : { bottom: 0 };
         const h = Math.max(120, Math.ceil(r.bottom + window.scrollY));
         const w = Math.ceil(document.documentElement.scrollWidth);
@@ -425,7 +324,6 @@ export function buildOfferWidgetHtml(): string {
     }
     try { const ro = new ResizeObserver(reportSize); ro.observe(document.body); ro.observe(document.getElementById("app")); } catch (_) {}
 
-    // Links: ask host to open (sandboxed iframes may block target=_blank)
     document.addEventListener("click", (e) => {
       const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
       if (!a || !inHost) return;
@@ -435,7 +333,6 @@ export function buildOfferWidgetHtml(): string {
       request("ui/open-link", { url });
     });
 
-    // ChatGPT compatibility: window.openai.toolOutput
     try { if (window.openai?.toolOutput) show(pickStructured(window.openai.toolOutput) || window.openai.toolOutput); } catch (_) {}
     window.addEventListener("openai:set_globals", () => {
       try { if (window.openai?.toolOutput) show(pickStructured(window.openai.toolOutput) || window.openai.toolOutput); } catch (_) {}
@@ -446,14 +343,13 @@ export function buildOfferWidgetHtml(): string {
     } else if (inHost) {
       if (!rendered) document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
       request("ui/initialize", {
-        appInfo: { name: "teklif-mcp-widget", version: "10.0.0" },
-        clientInfo: { name: "teklif-mcp-widget", version: "10.0.0" },
+        appInfo: { name: "teklif-mcp-widget", version: "11.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "11.0.0" },
         appCapabilities: { availableDisplayModes: ["inline"] },
         protocolVersion: "2026-01-26"
       }).then((res) => {
         notify("ui/notifications/initialized", {});
         lastH = 0; reportSize();
-        // Some hosts include the latest tool result in context; tool-result notification is canonical.
         const sc = res && res.hostContext && pickStructured(res.hostContext.toolResult);
         if (sc && !rendered) show(sc);
       });

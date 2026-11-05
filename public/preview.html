@@ -9,32 +9,41 @@
     body {
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-      background: #070a0e;
-      color: #e8eef7;
+      background: #f4f5f8;
+      color: #1a1b1f;
       min-height: 100vh;
     }
+    body.dark { background: #070a0e; color: #e8eef7; }
     .page {
       max-width: 920px;
       margin: 0 auto;
       padding: 28px 20px 48px;
     }
     h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.03em; }
-    p { color: #93a0b4; margin: 0 0 18px; font-size: 14px; line-height: 1.5; }
+    p { color: #667085; margin: 0 0 18px; font-size: 14px; line-height: 1.5; }
+    body.dark p { color: #93a0b4; }
     .frame-wrap {
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 20px;
+      border: 1px dashed rgba(100,98,243,0.35);
+      border-radius: 16px;
       overflow: hidden;
-      background: #0b0f14;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      background: transparent;
+      padding: 12px;
     }
     iframe {
       width: 100%;
-      height: 520px;
+      height: 420px;
       border: 0;
       display: block;
       background: transparent;
     }
-    code { font-size: 12px; background: #141a22; padding: 2px 6px; border-radius: 6px; }
+    code { font-size: 12px; background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 6px; }
+    body.dark code { background: #141a22; }
+    .tog { margin-bottom: 12px; display: flex; gap: 8px; }
+    .tog a {
+      font-size: 12px; padding: 6px 12px; border-radius: 999px; text-decoration: none;
+      border: 1px solid rgba(0,0,0,0.12); color: inherit;
+    }
+    body.dark .tog a { border-color: rgba(255,255,255,0.14); }
   </style>
 </head>
 <body>
@@ -42,13 +51,22 @@
     <h1>Teklif MCP — UI Önizleme</h1>
     <p>
       Motto: <strong>Tekliflerinizi her yapay zeka sunsun</strong>.
-      Aşağıdaki widget MCP Apps (<code>ui://teklif-mcp/offers-v10.html</code>) kaynağının
-      tarayıcı önizlemesidir. Veriler <em>örnek / demo</em>dir.
+      Widget kaynağı <code>ui://teklif-mcp/offers-v11.html</code> — yalnızca teklif kartları, şeffaf arka plan.
+      Veriler <em>örnek / demo</em>dir.
     </p>
-    <p style="margin-top:-8px"><a href="/widget" style="color:#aab4ff">search view</a> · <a href="/widget?view=compare" style="color:#aab4ff">compare view</a></p>
+    <div class="tog">
+      <a href="/preview">açık zemin</a>
+      <a href="/preview?bg=dark">koyu zemin</a>
+      <a href="/widget" style="color:#6462F3">/widget</a>
+    </div>
     <div class="frame-wrap">
-      <iframe id="w" title="Teklif widget" src="/widget"></iframe>
+      <iframe id="w" title="Teklif widget" src="/widget" allowtransparency="true"></iframe>
     </div>
   </div>
+  <script>
+    try {
+      if (new URLSearchParams(location.search).get("bg") === "dark") document.body.classList.add("dark");
+    } catch (_) {}
+  </script>
 </body>
 </html>
