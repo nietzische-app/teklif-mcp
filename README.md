@@ -72,7 +72,7 @@ Env: `PUBLIC_MCP_URL` (production `https://teklif.niyazi.site/mcp`).
 
 GitHub: [nietzische-app/teklif-mcp](https://github.com/nietzische-app/teklif-mcp)
 
-> Support email: **[PLACEHOLDER — pending; personal address may be used later]**
+> Support email: **niyazionderr@gmail.com**
 
 ## License
 
