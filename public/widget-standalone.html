@@ -441,7 +441,10 @@
     }
 
     // ---- MCP Apps bridge (SEP-1865, protocol 2026-01-26) ----
-    const inHost = window.parent && window.parent !== window;
+    let sameOriginParent = false;
+    try { sameOriginParent = window.parent !== window && !!window.parent.location.href; } catch (_) {}
+    // Real MCP Apps hosts sandbox us cross-origin; same-origin parent = our /preview page
+    const inHost = window.parent && window.parent !== window && !sameOriginParent;
     let rpcId = 1;
     const pending = {};
     function post(msg) { try { window.parent.postMessage(msg, "*"); } catch (_) {} }
