@@ -26,16 +26,35 @@ const UI_MIME = "text/html;profile=mcp-app";
 const PUBLIC_MCP_URL = process.env.PUBLIC_MCP_URL ?? "https://teklif-mcp.vercel.app/mcp";
 const CLAUDE_UI_DOMAIN =
   createHash("sha256").update(PUBLIC_MCP_URL).digest("hex").slice(0, 32) + ".claudemcpcontent.com";
-const TOOL_UI_META = {
+const TOOL_UI_META_BASE = {
   ui: { resourceUri: OFFER_WIDGET_URI, visibility: ["model", "app"] },
   // legacy flat key (deprecated in spec, still read by some hosts)
   "ui/resourceUri": OFFER_WIDGET_URI,
   // ChatGPT Apps SDK compatibility alias
   "openai/outputTemplate": OFFER_WIDGET_URI,
   "openai/widgetAccessible": true,
+} as const;
+
+const SEARCH_TOOL_UI_META = {
+  ...TOOL_UI_META_BASE,
   "openai/toolInvocation/invoking": "Teklifler aranıyor…",
   "openai/toolInvocation/invoked": "Teklifler hazır",
 };
+
+const COMPARE_TOOL_UI_META = {
+  ...TOOL_UI_META_BASE,
+  "openai/toolInvocation/invoking": "Teklifler karşılaştırılıyor…",
+  "openai/toolInvocation/invoked": "Karşılaştırma hazır",
+};
+
+/** Attach widget template on the tool *result* as well — some hosts (ChatGPT) only re-render UI when result _meta carries outputTemplate. */
+function resultUiMeta() {
+  return {
+    ui: { resourceUri: OFFER_WIDGET_URI },
+    "ui/resourceUri": OFFER_WIDGET_URI,
+    "openai/outputTemplate": OFFER_WIDGET_URI,
+  };
+}
 
 const categorySchema = z.enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"]).default("hepsi");
 const platformSchema = z.enum(["chatgpt", "claude", "gemini"]);
@@ -98,7 +117,7 @@ function createServer(): McpServer {
   const server = new McpServer(
     {
       name: "teklif-mcp",
-      version: "0.1.0",
+      version: "0.2.0",
     },
     {
       capabilities: {
@@ -126,15 +145,21 @@ function createServer(): McpServer {
           _meta: {
             ui: {
               prefersBorder: true,
-              csp: { connectDomains: [], resourceDomains: [] },
+              // Fully inline widget — declare empty allowlists so hosts don't show "CSP off" when enforcement is on.
+              csp: { connectDomains: [], resourceDomains: [], frameDomains: [] },
               // Claude requires {hash}.claudemcpcontent.com; ChatGPT expects an https origin
               // (defaults to web-sandbox.oaiusercontent.com), so omit it for ChatGPT.
               ...(process.env.UI_DOMAIN_OFF || chatgpt ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
             "openai/widgetPrefersBorder": true,
-            "openai/widgetDescription": "Örnek teklif kartları ve karşılaştırma tablosu",
+            "openai/widgetDescription": "Örnek teklif kartları ve karşılaştırma tablosu (dark)",
             "openai/ui": { availableDisplayModes: ["inline"] },
-            "openai/widgetCSP": { connect_domains: [], resource_domains: [], redirect_domains: ["https://example.com"] },
+            "openai/widgetCSP": {
+              connect_domains: [],
+              resource_domains: [],
+              frame_domains: [],
+              redirect_domains: ["https://example.com"],
+            },
           },
         },
       ],
@@ -167,7 +192,7 @@ function createServer(): McpServer {
           .default("chatgpt")
           .describe("UTM için hedef asistan: chatgpt | claude | gemini"),
       },
-      _meta: TOOL_UI_META,
+      _meta: SEARCH_TOOL_UI_META,
     },
     async ({ category, budget, city, platform }) => {
       const offers = filterOffers(category ?? "hepsi", budget, city);
@@ -176,6 +201,7 @@ function createServer(): McpServer {
         motto: MOTTO,
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
+        view: "search" as const,
         category: category ?? "hepsi",
         budget: budget ?? null,
         city: city ?? null,
@@ -186,6 +212,7 @@ function createServer(): McpServer {
       return {
         content: [{ type: "text" as const, text: textSummary(offers) }],
         structuredContent,
+        _meta: resultUiMeta(),
       };
     }
   );
@@ -195,17 +222,17 @@ function createServer(): McpServer {
     {
       title: "Teklifleri karşılaştır",
       description:
-        "Verilen teklif id listesini veya kategori filtresini fiyat/özellik tablosu olarak karşılaştırır (örnek veri).",
+        "ALWAYS call this tool when the user asks to compare offers — e.g. Turkish 'bunları karşılaştır', 'karşılaştır', 'hangisi daha iyi', 'fiyat karşılaştır', or English 'compare these' / 'compare offers'. Do NOT answer with a markdown table; this tool returns the same MCP/ChatGPT widget in compare view (structuredContent + outputTemplate). Accepts offer ids from a prior search_offers result, or category/city filters. Demo/örnek data only.",
       inputSchema: {
         offer_ids: z
           .array(z.string())
           .optional()
-          .describe("Karşılaştırılacak teklif id'leri. Boşsa kategoriye göre en ucuzlar."),
+          .describe("Karşılaştırılacak teklif id'leri (search_offers sonuçlarından). Boşsa kategori/şehir filtresine göre en uygunlar."),
         category: categorySchema.optional().default("hepsi"),
         city: z.string().optional().describe("Şehir filtresi (örn. İstanbul)"),
         platform: platformSchema.optional().default("chatgpt"),
       },
-      _meta: TOOL_UI_META,
+      _meta: COMPARE_TOOL_UI_META,
     },
     async ({ offer_ids, category, city, platform }) => {
       let offers: Offer[];
@@ -222,6 +249,9 @@ function createServer(): McpServer {
         motto: MOTTO,
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
+        view: "compare" as const,
+        category: category ?? "hepsi",
+        city: city ?? null,
         platform: platform ?? "chatgpt",
         offers: serialized,
         compare: serialized,
@@ -230,10 +260,11 @@ function createServer(): McpServer {
         content: [
           {
             type: "text" as const,
-            text: `Karşılaştırma (${offers.length} teklif):\n${textSummary(offers)}`,
+            text: `Karşılaştırma (${offers.length} teklif) — widget'ta tablo olarak gösterilir:\n${textSummary(offers)}`,
           },
         ],
         structuredContent,
+        _meta: resultUiMeta(),
       };
     }
   );

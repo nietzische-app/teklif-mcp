@@ -6,7 +6,8 @@
   <title>Teklif MCP — Offers</title>
   <style>
     :root {
-      color-scheme: light dark;
+      /* Always dark — ignore host / OS prefers-color-scheme (ChatGPT light theme was flipping this). */
+      color-scheme: only dark;
       --bg: #060607;
       --bg-elev: #0E0E10;
       --card: #141416;
@@ -40,40 +41,14 @@
       --spot: radial-gradient(ellipse 70% 45% at 50% -10%, rgba(239,240,246,0.14), transparent 60%);
       --glow: 0 0 0 1px rgba(239,240,246,0.12), 0 8px 28px rgba(100,98,243,0.18), 0 2px 10px rgba(255,255,255,0.18);
     }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #F3F4F8;
-        --bg-elev: #FFFFFF;
-        --card: #FFFFFF;
-        --card-border: rgba(20, 20, 30, 0.08);
-        --text: #12121A;
-        --muted: #5C5E78;
-        --faint: #8A8CA8;
-        --cta: #12121A;
-        --cta-ink: #FFFFFF;
-        --spot: radial-gradient(ellipse 70% 45% at 50% -10%, rgba(100,98,243,0.12), transparent 60%);
-        --glow: 0 0 0 1px rgba(20,20,30,0.06), 0 10px 28px rgba(100,98,243,0.16), 0 2px 8px rgba(0,0,0,0.08);
-        --mesh-1: radial-gradient(120% 90% at 10% 20%, #6462F3 0%, transparent 55%),
-                  radial-gradient(100% 80% at 90% 10%, #C95CE1 0%, transparent 50%),
-                  radial-gradient(90% 100% at 50% 100%, #7AA1E2 0%, transparent 55%),
-                  linear-gradient(160deg, #c8c6f5 0%, #e8e9f4 100%);
-        --mesh-2: radial-gradient(110% 90% at 85% 15%, #C95CE1 0%, transparent 50%),
-                  radial-gradient(100% 80% at 15% 30%, #6462F3 0%, transparent 55%),
-                  radial-gradient(80% 90% at 40% 100%, #7AA1E2 0%, transparent 50%),
-                  linear-gradient(150deg, #e6c4f0 0%, #e8e9f4 100%);
-        --mesh-3: radial-gradient(110% 90% at 20% 10%, #7AA1E2 0%, transparent 50%),
-                  radial-gradient(100% 80% at 80% 40%, #6462F3 0%, transparent 55%),
-                  radial-gradient(90% 100% at 60% 100%, #C95CE1 0%, transparent 50%),
-                  linear-gradient(170deg, #c5d6f5 0%, #e8e9f4 100%);
-      }
-    }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
       height: auto;
       font-family: var(--font);
-      background: transparent;
+      background: #060607;
       color: var(--text);
+      color-scheme: only dark;
       -webkit-font-smoothing: antialiased;
     }
     .shell {
@@ -113,9 +88,6 @@
       border-radius: var(--radius-pill);
       flex: 0 0 auto;
     }
-    @media (prefers-color-scheme: light) {
-      .seg { background: rgba(188,190,218,0.35); }
-    }
     .seg button {
       appearance: none; border: 0; cursor: default;
       background: transparent; color: var(--muted);
@@ -144,9 +116,6 @@
       overflow: hidden;
       min-width: 0;
       box-shadow: 0 10px 30px rgba(0,0,0,0.28);
-    }
-    @media (prefers-color-scheme: light) {
-      .card { box-shadow: 0 10px 28px rgba(20,20,40,0.08); }
     }
     .hero {
       position: relative;
@@ -265,9 +234,6 @@
       color: #fff;
       font-weight: 700;
     }
-    @media (prefers-color-scheme: light) {
-      td.num.best { color: var(--accent-a); }
-    }
     tr:last-child td { border-bottom: 0; }
     .chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -300,6 +266,28 @@
       white-space: nowrap;
     }
     .cta-btn:hover { filter: brightness(1.05); }
+
+    /* —— COMPARE VIEW (tool: compare_offers) —— */
+    .shell.compare-mode .rail { display: none; }
+    .shell.compare-mode .compare-wrap {
+      margin: 4px 12px 8px;
+      flex: 0 0 auto;
+    }
+    .shell.compare-mode .compare-wrap table { font-size: 12px; }
+    .shell.compare-mode th, .shell.compare-mode td { padding: 8px 12px; }
+    .shell.compare-mode td.num.best {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(100,98,243,0.35), rgba(201,92,225,0.25));
+      border-radius: 8px;
+    }
+    .feat-cell { font-size: 10px; color: var(--muted); max-width: 220px; }
+    .view-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 9px; border-radius: var(--radius-pill);
+      font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      background: rgba(100,98,243,0.22); color: #D6D5FF;
+      border: 1px solid rgba(100,98,243,0.35);
+    }
     .empty {
       padding: 36px 16px; text-align: center;
       font-size: 12px; color: var(--muted);
@@ -346,6 +334,8 @@
       const motto = payload?.motto || "Tekliflerinizi her yapay zeka sunsun";
       const activePlatform = payload?.platform || "ALL";
       const compare = Array.isArray(payload?.compare) ? payload.compare : offers.slice(0, 4);
+      const view = String(payload?.view || "search").toLowerCase() === "compare" ? "compare" : "search";
+      const isCompare = view === "compare";
 
       if (!offers.length) {
         app.innerHTML = '<div class="empty">teklif yok — search_offers | compare_offers</div>';
@@ -392,26 +382,39 @@
       const rows = compare.map((o) => {
         const best = o.id === bestId;
         const pct = savePct(o);
+        const feats = Array.isArray(o.highlights) ? o.highlights.slice(0, 2).join(" · ") : "";
         return (
           "<tr>" +
             '<td><span class="chip"><span class="dot"></span>' + escapeHtml(o.brand.split(" ")[0]) + "</span></td>" +
-            "<td>" + escapeHtml(o.title) + (o.city ? " · " + escapeHtml(o.city) : "") + "</td>" +
+            "<td>" + escapeHtml(o.title) + (o.city ? " · " + escapeHtml(o.city) : "") +
+              (isCompare && feats ? '<div class="feat-cell">' + escapeHtml(feats) + "</div>" : "") +
+            "</td>" +
             '<td class="num' + (best ? " best" : "") + '">' + formatPrice(o.priceTry) + "</td>" +
             '<td class="num">' + (pct != null ? "-" + pct + "%" : "—") + "</td>" +
+            (isCompare ? '<td class="num">' + (o.rating != null ? Number(o.rating).toFixed(1) : "—") + "</td>" : "") +
           "</tr>"
         );
       }).join("");
 
+      const headCols = isCompare
+        ? "<th>Marka</th><th>Teklif</th><th style='text-align:right'>Şimdi</th><th style='text-align:right'>Δ</th><th style='text-align:right'>Puan</th>"
+        : "<th>Marka</th><th>Teklif</th><th style='text-align:right'>Şimdi</th><th style='text-align:right'>Δ</th>";
+      const sectionTitle = isCompare ? ("Karşılaştırma · " + compare.length + " teklif") : "Karşılaştır";
+      const eyebrow = isCompare
+        ? '<div class="eyebrow">Teklif MCP · v9 <span class="view-pill">compare</span></div>'
+        : '<div class="eyebrow">Teklif MCP · v9</div>';
+
+      app.className = "shell" + (isCompare ? " compare-mode" : "");
       app.innerHTML =
         '<div class="hdr">' +
-          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v8</div>' +
-          '<div class="title">' + escapeHtml(motto) + ' <span>/ örnek</span></div></div>' +
+          '<div class="brand-block">' + eyebrow +
+          '<div class="title">' + escapeHtml(isCompare ? "Teklifleri karşılaştır" : motto) + ' <span>/ örnek</span></div></div>' +
           '<div class="seg">' + segs + "</div>" +
         "</div>" +
-        '<div class="rail">' + cards + "</div>" +
+        (isCompare ? "" : '<div class="rail">' + cards + "</div>") +
         '<div class="compare-wrap">' +
-          '<div class="section-label"><span>Karşılaştır</span><span>fiyat ↑</span></div>' +
-          "<table><thead><tr><th>Marka</th><th>Teklif</th><th style='text-align:right'>Şimdi</th><th style='text-align:right'>Δ</th></tr></thead>" +
+          '<div class="section-label"><span>' + sectionTitle + '</span><span>fiyat ↑</span></div>' +
+          "<table><thead><tr>" + headCols + "</tr></thead>" +
           "<tbody>" + rows + "</tbody></table>" +
         "</div>" +
         '<div class="cta-bar">' +
@@ -518,8 +521,8 @@
     } else if (inHost) {
       if (!rendered) document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
       request("ui/initialize", {
-        appInfo: { name: "teklif-mcp-widget", version: "8.0.0" },
-        clientInfo: { name: "teklif-mcp-widget", version: "8.0.0" },
+        appInfo: { name: "teklif-mcp-widget", version: "9.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "9.0.0" },
         appCapabilities: { availableDisplayModes: ["inline"] },
         protocolVersion: "2026-01-26"
       }).then((res) => {
@@ -530,14 +533,21 @@
         if (sc && !rendered) show(sc);
       });
     } else {
+      const demoOffers = [
+        { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", rating: 4.6, highlights: ["Yetkili servis", "İkame araç 15 gün"], trackedUrl: "https://example.com/demo/kasko-ist-genis" },
+        { id: "kasko-ist-ekonomik", city: "İstanbul", category: "kasko", brand: "Martı Güvence (örnek)", title: "Dar Kasko — Ekonomik paket", priceTry: 11450, wasPriceTry: 13200, badge: "HOT", rating: 4.3, highlights: ["Anlaşmalı servis", "12 taksit"], trackedUrl: "https://example.com/demo/kasko-ist-ekonomik" },
+        { id: "kasko-ank-tam", city: "Ankara", category: "kasko", brand: "Başkent Teminat (örnek)", title: "Tam Kasko — Hasarsızlık korumalı", priceTry: 16750, wasPriceTry: 19900, badge: "Premium", rating: 4.7, highlights: ["Hasarsızlık koruma", "Cam hasarı"], trackedUrl: "https://example.com/demo/kasko-ank-tam" },
+        { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", rating: 4.8, highlights: ["Tam kasko", "Sınırsız km"], trackedUrl: "https://example.com/demo/anadoludrive/i20" }
+      ];
+      let view = "search";
+      try { view = new URLSearchParams(location.search).get("view") === "compare" ? "compare" : "search"; } catch (_) {}
+      const list = view === "compare" ? demoOffers.slice(0, 4) : demoOffers.slice(0, 3);
       show({
         motto: "Tekliflerinizi her yapay zeka sunsun",
         platform: "ALL",
-        offers: [
-          { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", trackedUrl: "https://example.com/demo/kasko-ist-genis" },
-          { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", trackedUrl: "https://example.com/demo/anadoludrive/i20" },
-          { id: "shop-espresso", city: "İzmir", category: "e_ticaret", brand: "KahveKöşk (örnek)", title: "Espresso makinesi Barista Mini", priceTry: 4290, wasPriceTry: 5050, badge: "%15", trackedUrl: "https://example.com/demo/kahvekosk/barista-mini" }
-        ]
+        view,
+        offers: list,
+        compare: list
       });
     }
   </script>
