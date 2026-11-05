@@ -47,6 +47,13 @@ const COMPARE_TOOL_UI_META = {
   "openai/toolInvocation/invoked": "Karşılaştırma hazır",
 };
 
+/** Registry / client hints: read-only demo tools that may surface external offer URLs. */
+const TOOL_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: true,
+} as const;
+
 /** Attach widget template on the tool *result* as well — some hosts (ChatGPT) only re-render UI when result _meta carries outputTemplate. */
 function resultUiMeta() {
   return {
@@ -173,6 +180,7 @@ function createServer(): McpServer {
       title: "Teklif ara",
       description:
         "Örnek (demo) marka tekliflerini kategori, şehir ve bütçeye göre arar. Kategoriler: araç kiralama, e-ticaret, kasko, trafik sigortası. Tüm veriler kurgusaldır (örnek). Sonuçlar UI widget ile gösterilir.",
+      annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         category: categorySchema.describe(
           "arac_kiralama | e_ticaret | kasko | trafik_sigortasi | hepsi"
@@ -222,6 +230,7 @@ function createServer(): McpServer {
       title: "Teklifleri karşılaştır",
       description:
         "ALWAYS call this tool when the user asks to compare offers — e.g. Turkish 'bunları karşılaştır', 'karşılaştır', 'hangisi daha iyi', 'fiyat karşılaştır', or English 'compare these' / 'compare offers'. Do NOT answer with a markdown table; this tool returns the same MCP/ChatGPT widget as offer cards in compare view (structuredContent + outputTemplate). Accepts offer ids from a prior search_offers result, or category/city filters. Demo/örnek data only.",
+      annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         offer_ids: z
           .array(z.string())
@@ -273,6 +282,7 @@ function createServer(): McpServer {
       title: "Teklif linki al (UTM)",
       description:
         "Bir teklif için platforma özel takip linki üretir. utm_source=chatgpt|claude|gemini, utm_medium=mcp.",
+      annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         offer_id: z.string().describe("Teklif id, örn. rent-eco-i20 veya kasko-ist-genis"),
         platform: platformSchema.describe("chatgpt | claude | gemini"),

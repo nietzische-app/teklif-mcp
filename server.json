@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.nietzische-app/teklif-mcp",
+  "title": "Teklif",
+  "description": "Demo: brand offers (car rental, e-commerce, insurance) for ChatGPT, Claude, Gemini via MCP.",
+  "websiteUrl": "https://teklif-mcp.vercel.app",
+  "repository": {
+    "url": "https://github.com/nietzische-app/teklif-mcp",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://teklif-mcp.vercel.app/mcp"
+    }
+  ]
+}
