@@ -261,7 +261,7 @@ app.get("/health", (_req, res) => {
 app.get("/preview", (_req, res) => {
   const previewPath = join(PUBLIC_DIR, "preview.html");
   if (!existsSync(previewPath)) {
-    res.status(404).send("preview.html missing");
+    res.redirect("/preview.html");
     return;
   }
   res.type("html").send(readFileSync(previewPath, "utf8"));
