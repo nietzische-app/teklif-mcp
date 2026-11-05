@@ -6,7 +6,7 @@ Neutral, user-initiated **offer search and comparison** exposed as a remote MCP 
 
 **Current catalog:** operator-owned [Aegis Scanner](https://aegisscanner.com/landing#pricing) security plans (source field = `aegisscanner.com pricing (operator-owned)`). Teklif does **not** take payment or book anything; links open the provider site. There is **no paid ranking**, sponsored placement or affiliate tracking.
 
-**Operator model:** Teklif is run by the operator (agency). Today it surfaces the operator’s own product plans. The same connector pattern is intended later as a service offered to other companies — still without paid ranking unless that is explicitly disclosed.
+**Operator model:** Teklif is published by **Nodify** (agency). Today it surfaces Nodify’s own Aegis Scanner plans. The same connector pattern is intended later as a service offered to other companies — still without paid ranking unless that is explicitly disclosed.
 
 ## What it does
 
@@ -72,7 +72,7 @@ Env: `PUBLIC_MCP_URL` (production `https://teklif.niyazi.site/mcp`).
 
 GitHub: [nietzische-app/teklif-mcp](https://github.com/nietzische-app/teklif-mcp)
 
-> Support email: **niyazionderr@gmail.com**
+> Publisher: **Nodify** · Support: **niyazionderr@gmail.com**
 
 ## License
 
