@@ -40,6 +40,17 @@ const TOOL_UI_META = {
 const categorySchema = z.enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"]).default("hepsi");
 const platformSchema = z.enum(["chatgpt", "claude", "gemini"]);
 
+/** ChatGPT's MCP client identifies as openai-mcp and sends openai/* request _meta. */
+function isChatGptClient(extra: any): boolean {
+  if (process.env.FORCE_CLIENT === "chatgpt") return true;
+  if (process.env.FORCE_CLIENT === "claude") return false;
+  const h = extra?.requestInfo?.headers ?? {};
+  const ua = String(h["user-agent"] ?? "");
+  if (/openai|chatgpt/i.test(ua)) return true;
+  const m = extra?._meta ?? {};
+  return Object.keys(m).some((k) => k.startsWith("openai/"));
+}
+
 function filterOffers(category: z.infer<typeof categorySchema>, budget?: number, city?: string): Offer[] {
   const c = city ? normalizeText(city) : "";
   return OFFERS.filter((o) => {
@@ -104,7 +115,9 @@ function createServer(): McpServer {
       description: "Teklif kartı carousel + karşılaştırma tablosu (MCP Apps UI)",
       mimeType: UI_MIME,
     },
-    async () => ({
+    async (_uri, extra) => {
+      const chatgpt = isChatGptClient(extra);
+      return {
       contents: [
         {
           uri: OFFER_WIDGET_URI,
@@ -114,14 +127,19 @@ function createServer(): McpServer {
             ui: {
               prefersBorder: true,
               csp: { connectDomains: [], resourceDomains: [] },
-              ...(process.env.UI_DOMAIN_OFF ? {} : { domain: CLAUDE_UI_DOMAIN }),
+              // Claude requires {hash}.claudemcpcontent.com; ChatGPT expects an https origin
+              // (defaults to web-sandbox.oaiusercontent.com), so omit it for ChatGPT.
+              ...(process.env.UI_DOMAIN_OFF || chatgpt ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
             "openai/widgetPrefersBorder": true,
             "openai/widgetDescription": "Örnek teklif kartları ve karşılaştırma tablosu",
+            "openai/ui": { availableDisplayModes: ["inline"] },
+            "openai/widgetCSP": { connect_domains: [], resource_domains: [], redirect_domains: ["https://example.com"] },
           },
         },
       ],
-    })
+      };
+    }
   );
 
   server.registerTool(

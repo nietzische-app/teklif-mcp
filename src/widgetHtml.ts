@@ -1,5 +1,5 @@
-/** Inline MCP Apps UI — Widget v5 inspired by Dribbble Pricing Card Dark Mode (bebykurniawan), max-height 500px */
-export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v7.html";
+/** Inline MCP Apps UI — Widget v5 inspired by Dribbble Pricing Card Dark Mode (bebykurniawan); grows to content height (v8) */
+export const OFFER_WIDGET_URI = "ui://teklif-mcp/offers-v8.html";
 
 export function buildOfferWidgetHtml(): string {
   return `<!DOCTYPE html>
@@ -74,7 +74,6 @@ export function buildOfferWidgetHtml(): string {
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
-      min-height: 120px;
       height: auto;
       font-family: var(--font);
       background: transparent;
@@ -84,8 +83,7 @@ export function buildOfferWidgetHtml(): string {
     .shell {
       width: 100%;
       max-width: 720px;
-      max-height: 500px;
-      overflow: hidden;
+      overflow: visible;
       display: flex;
       flex-direction: column;
       background:
@@ -246,7 +244,7 @@ export function buildOfferWidgetHtml(): string {
     }
     /* —— COMPARE —— */
     .compare-wrap {
-      flex: 1 1 auto; min-height: 0; overflow: auto;
+      flex: 0 0 auto; overflow: visible;
       margin: 0 12px; padding: 0;
       background: var(--bg-elev);
       border: 1px solid var(--card-border);
@@ -410,7 +408,7 @@ export function buildOfferWidgetHtml(): string {
 
       app.innerHTML =
         '<div class="hdr">' +
-          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v7</div>' +
+          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v8</div>' +
           '<div class="title">' + escapeHtml(motto) + ' <span>/ örnek</span></div></div>' +
           '<div class="seg">' + segs + "</div>" +
         "</div>" +
@@ -488,13 +486,16 @@ export function buildOfferWidgetHtml(): string {
 
     let lastH = 0;
     function reportSize() {
-      if (!inHost) return;
+      if (!inHost && !window.openai) return;
       requestAnimationFrame(() => {
         const app = document.getElementById("app");
-        const h = Math.ceil(Math.max(app ? app.getBoundingClientRect().height : 0, document.body.scrollHeight, document.documentElement.scrollHeight, 120));
+        // Measure content, not the viewport (scrollHeight never shrinks below iframe height)
+        const r = app ? app.getBoundingClientRect() : { bottom: 0 };
+        const h = Math.max(120, Math.ceil(r.bottom + window.scrollY));
         const w = Math.ceil(document.documentElement.scrollWidth);
         if (h === lastH) return;
         lastH = h;
+        try { window.openai?.notifyIntrinsicHeight?.(h); } catch (_) {}
         notify("ui/notifications/size-changed", { width: w, height: h });
       });
     }
@@ -519,10 +520,10 @@ export function buildOfferWidgetHtml(): string {
     if (window.__TEKLIF_PREVIEW__) {
       show(window.__TEKLIF_PREVIEW__);
     } else if (inHost) {
-      document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
+      if (!rendered) document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
       request("ui/initialize", {
-        appInfo: { name: "teklif-mcp-widget", version: "7.0.0" },
-        clientInfo: { name: "teklif-mcp-widget", version: "7.0.0" },
+        appInfo: { name: "teklif-mcp-widget", version: "8.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "8.0.0" },
         appCapabilities: { availableDisplayModes: ["inline"] },
         protocolVersion: "2026-01-26"
       }).then((res) => {
