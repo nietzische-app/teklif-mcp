@@ -1,7 +1,7 @@
 {
   "name": "teklif-mcp",
-  "version": "0.1.0",
-  "description": "Teklif MCP — marka tekliflerini ChatGPT, Claude ve Gemini'ye tek MCP sunucusuyla taşıyan demo",
+  "version": "0.3.0",
+  "description": "Teklif MCP \u2014 neutral offer search and comparison (car rental, e-commerce, insurance) via MCP; sample data",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

@@ -198,10 +198,9 @@
       const pct = savePct(o);
       const lines = [];
       lines.push(o.brand + " · örnek veri");
+      lines.push("Source: " + (o.source || "Sample data"));
       if (o.rating != null) lines.push("Puan " + Number(o.rating).toFixed(1) + " / 5");
-      if (pct != null) lines.push("%" + pct + " anlık indirim");
-      else lines.push("Canlı MCP teklifi");
-      lines.push("ChatGPT · Claude · Gemini");
+      if (pct != null) lines.push("%" + pct + " vs previous price");
       return lines.slice(0, 4);
     }
 
@@ -220,14 +219,14 @@
       const cardLimit = isCompare ? 5 : 4;
       const cards = offers.slice(0, cardLimit).map((o) => {
         const pct = savePct(o);
-        const hot = o.badge && /hot|popüler|premium/i.test(String(o.badge));
-        const pillText = hot ? (o.badge || "HOT") : (pct != null ? "-" + pct + "%" : (o.badge || "TEKLİF"));
-        const href = o.trackedUrl || o.baseUrl || "#";
+        const badge = o.badge && /^-?d+%$/.test(String(o.badge).trim()) ? String(o.badge).trim() : null;
+        const pillText = badge || (pct != null ? "-" + pct + "%" : "TEKLİF");
+        const href = o.offerUrl || o.trackedUrl || o.baseUrl || "#";
         const feats = featLines(o).map((f) => "<li>" + escapeHtml(f) + "</li>").join("");
         return (
           '<article class="card">' +
             '<div class="hero">' +
-              '<span class="pill' + (hot ? " hot" : "") + '">' + escapeHtml(pillText) + "</span>" +
+              '<span class="pill">' + escapeHtml(pillText) + "</span>" +
               '<div class="price-row">' +
                 '<div class="price">' + formatPrice(o.priceTry) + "<small>/teklif</small></div>" +
                 (o.wasPriceTry != null ? '<div class="was">' + formatPrice(o.wasPriceTry) + "</div>" : "") +
@@ -351,17 +350,17 @@
       });
     } else {
       const demoOffers = [
-        { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", rating: 4.6, highlights: ["Yetkili servis", "İkame araç 15 gün"], trackedUrl: "https://example.com/demo/kasko-ist-genis" },
-        { id: "kasko-ist-ekonomik", city: "İstanbul", category: "kasko", brand: "Martı Güvence (örnek)", title: "Dar Kasko — Ekonomik paket", priceTry: 11450, wasPriceTry: 13200, badge: "HOT", rating: 4.3, highlights: ["Anlaşmalı servis", "12 taksit"], trackedUrl: "https://example.com/demo/kasko-ist-ekonomik" },
-        { id: "kasko-ank-tam", city: "Ankara", category: "kasko", brand: "Başkent Teminat (örnek)", title: "Tam Kasko — Hasarsızlık korumalı", priceTry: 16750, wasPriceTry: 19900, badge: "Premium", rating: 4.7, highlights: ["Hasarsızlık koruma", "Cam hasarı"], trackedUrl: "https://example.com/demo/kasko-ank-tam" },
-        { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", rating: 4.8, highlights: ["Tam kasko", "Sınırsız km"], trackedUrl: "https://example.com/demo/anadoludrive/i20" }
+        { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", rating: 4.6, highlights: ["Yetkili servis", "İkame araç 15 gün"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ist-genis", trackedUrl: "https://teklif.niyazi.site/o/kasko-ist-genis" },
+        { id: "kasko-ist-ekonomik", city: "İstanbul", category: "kasko", brand: "Martı Güvence (örnek)", title: "Dar Kasko — Ekonomik paket", priceTry: 11450, wasPriceTry: 13200, badge: "-13%", rating: 4.3, highlights: ["Anlaşmalı servis", "12 taksit"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ist-ekonomik", trackedUrl: "https://teklif.niyazi.site/o/kasko-ist-ekonomik" },
+        { id: "kasko-ank-tam", city: "Ankara", category: "kasko", brand: "Başkent Teminat (örnek)", title: "Tam Kasko — Hasarsızlık korumalı", priceTry: 16750, wasPriceTry: 19900, badge: "-16%", rating: 4.7, highlights: ["Hasarsızlık koruma", "Cam hasarı"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/kasko-ank-tam", trackedUrl: "https://teklif.niyazi.site/o/kasko-ank-tam" },
+        { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", rating: 4.8, highlights: ["Tam kasko", "Sınırsız km"], source: "Sample data", offerUrl: "https://teklif.niyazi.site/o/rent-eco-i20", trackedUrl: "https://teklif.niyazi.site/o/rent-eco-i20" }
       ];
       let view = "search";
       try { view = new URLSearchParams(location.search).get("view") === "compare" ? "compare" : "search"; } catch (_) {}
       const list = view === "compare" ? demoOffers.slice(0, 5) : demoOffers.slice(0, 4);
       show({
-        motto: "Tekliflerinizi her yapay zeka sunsun",
-        platform: "ALL",
+        isDemo: true,
+        sortedBy: "price",
         view,
         offers: list
       });

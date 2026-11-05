@@ -9,21 +9,23 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import {
   DEMO_DISCLAIMER,
   OFFERS,
+  OFFER_SOURCE,
   formatPrice,
   normalizeText,
   type Offer,
   type OfferCategory,
 } from "./data.js";
-import { withOfferUtm, type AiPlatform } from "./utm.js";
+import { offerPageUrl } from "./utm.js";
 import { OFFER_WIDGET_URI, buildOfferWidgetHtml } from "./widgetHtml.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = [join(__dirname, "..", "public"), join(process.cwd(), "public")].find((d) => existsSync(d)) ?? join(__dirname, "..", "public");
 const PORT = Number(process.env.PORT ?? 8787);
-const MOTTO = "Tekliflerinizi her yapay zeka sunsun";
+/** Website-only motto — never appended to tool outputs. */
+const SITE_MOTTO = "Tekliflerinizi her yapay zeka sunsun";
 const UI_MIME = "text/html;profile=mcp-app";
 /** Public connector URL; Claude validates ui.domain = sha256(url)[:32] + ".claudemcpcontent.com" */
-const PUBLIC_MCP_URL = process.env.PUBLIC_MCP_URL ?? "https://teklif-mcp.vercel.app/mcp";
+const PUBLIC_MCP_URL = process.env.PUBLIC_MCP_URL ?? "https://teklif.niyazi.site/mcp";
 const CLAUDE_UI_DOMAIN =
   createHash("sha256").update(PUBLIC_MCP_URL).digest("hex").slice(0, 32) + ".claudemcpcontent.com";
 const TOOL_UI_META_BASE = {
@@ -37,21 +39,21 @@ const TOOL_UI_META_BASE = {
 
 const SEARCH_TOOL_UI_META = {
   ...TOOL_UI_META_BASE,
-  "openai/toolInvocation/invoking": "Teklifler aranıyor…",
-  "openai/toolInvocation/invoked": "Teklifler hazır",
+  "openai/toolInvocation/invoking": "Searching offers…",
+  "openai/toolInvocation/invoked": "Offers ready",
 };
 
 const COMPARE_TOOL_UI_META = {
   ...TOOL_UI_META_BASE,
-  "openai/toolInvocation/invoking": "Teklifler karşılaştırılıyor…",
-  "openai/toolInvocation/invoked": "Karşılaştırma hazır",
+  "openai/toolInvocation/invoking": "Comparing offers…",
+  "openai/toolInvocation/invoked": "Comparison ready",
 };
 
-/** Registry / client hints: read-only demo tools that may surface external offer URLs. */
+/** Registry / client hints: read-only demo tools over embedded sample data. */
 const TOOL_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
-  openWorldHint: true,
+  openWorldHint: false,
 } as const;
 
 /** Attach widget template on the tool *result* as well — some hosts (ChatGPT) only re-render UI when result _meta carries outputTemplate. */
@@ -63,8 +65,13 @@ function resultUiMeta() {
   };
 }
 
-const categorySchema = z.enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"]).default("hepsi");
-const platformSchema = z.enum(["chatgpt", "claude", "gemini"]);
+const categorySchema = z
+  .enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"])
+  .default("hepsi");
+
+const sortBySchema = z.enum(["price", "rating", "relevance"]).default("price");
+
+type SortBy = z.infer<typeof sortBySchema>;
 
 /** ChatGPT's MCP client identifies as openai-mcp and sends openai/* request _meta. */
 function isChatGptClient(extra: any): boolean {
@@ -77,17 +84,38 @@ function isChatGptClient(extra: any): boolean {
   return Object.keys(m).some((k) => k.startsWith("openai/"));
 }
 
-function filterOffers(category: z.infer<typeof categorySchema>, budget?: number, city?: string): Offer[] {
+function sortOffers(offers: Offer[], sortBy: SortBy): Offer[] {
+  const copy = [...offers];
+  if (sortBy === "rating") {
+    return copy.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.priceTry - b.priceTry);
+  }
+  if (sortBy === "relevance") {
+    // No paid placement: relevance = rating then price (transparent, deterministic).
+    return copy.sort(
+      (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.priceTry - b.priceTry || a.id.localeCompare(b.id)
+    );
+  }
+  // price (default): lowest first
+  return copy.sort((a, b) => a.priceTry - b.priceTry || a.id.localeCompare(b.id));
+}
+
+function filterOffers(
+  category: z.infer<typeof categorySchema>,
+  budget?: number,
+  city?: string,
+  sortBy: SortBy = "price"
+): Offer[] {
   const c = city ? normalizeText(city) : "";
-  return OFFERS.filter((o) => {
+  const filtered = OFFERS.filter((o) => {
     const catOk = category === "hepsi" || o.category === (category as OfferCategory);
     const budgetOk = budget == null || o.priceTry <= budget;
     const cityOk = !c || normalizeText(o.city) === c;
     return catOk && budgetOk && cityOk;
-  }).sort((a, b) => a.priceTry - b.priceTry);
+  });
+  return sortOffers(filtered, sortBy);
 }
 
-function serializeOffers(offers: Offer[], platform: AiPlatform = "chatgpt") {
+function serializeOffers(offers: Offer[]) {
   return offers.map((o) => ({
     id: o.id,
     brand: o.brand,
@@ -103,28 +131,40 @@ function serializeOffers(offers: Offer[], platform: AiPlatform = "chatgpt") {
     imageEmoji: o.imageEmoji,
     heroFrom: o.heroFrom ?? null,
     heroTo: o.heroTo ?? null,
+    source: o.source ?? OFFER_SOURCE,
     isDemo: true as const,
     baseUrl: o.baseUrl,
-    trackedUrl: withOfferUtm(o.baseUrl, platform, o.id),
+    offerUrl: offerPageUrl(o.baseUrl),
+    // Widget compat alias (no tracking params)
+    trackedUrl: offerPageUrl(o.baseUrl),
   }));
 }
 
-function textSummary(offers: Offer[]): string {
+function sortLabel(sortBy: SortBy): string {
+  if (sortBy === "rating") return "Sorted by rating (highest first). No paid placement.";
+  if (sortBy === "relevance") return "Sorted by relevance (rating, then price). No paid placement.";
+  return "Sorted by price (lowest first). No paid placement.";
+}
+
+function textSummary(offers: Offer[], sortBy: SortBy = "price"): string {
   if (!offers.length) {
-    return `${DEMO_DISCLAIMER}\nEşleşen teklif bulunamadı.`;
+    return `${DEMO_DISCLAIMER}\nNo matching offers.`;
   }
   const lines = offers.map(
     (o, i) =>
-      `${i + 1}. [${o.badge ?? "Teklif"}] ${o.brand} — ${o.title} [${o.city}]: ${formatPrice(o.priceTry)} (${o.id})`
+      `${i + 1}. ${o.brand} — ${o.title} [${o.city}]: ${formatPrice(o.priceTry)}` +
+      (o.rating != null ? ` · ★${o.rating}` : "") +
+      (o.badge ? ` · ${o.badge}` : "") +
+      ` · source: ${o.source ?? OFFER_SOURCE} (${o.id})`
   );
-  return `${DEMO_DISCLAIMER}\n${MOTTO}\n\n${lines.join("\n")}`;
+  return `${DEMO_DISCLAIMER}\n${sortLabel(sortBy)}\n\n${lines.join("\n")}`;
 }
 
 function createServer(): McpServer {
   const server = new McpServer(
     {
       name: "teklif-mcp",
-      version: "0.2.0",
+      version: "0.3.0",
     },
     {
       capabilities: {
@@ -138,7 +178,7 @@ function createServer(): McpServer {
     "offers-widget",
     OFFER_WIDGET_URI,
     {
-      description: "Teklif kartı carousel (MCP Apps UI, cards-only)",
+      description: "Offer card carousel (MCP Apps UI, cards-only)",
       mimeType: UI_MIME,
     },
     async (_uri, extra) => {
@@ -159,13 +199,13 @@ function createServer(): McpServer {
               ...(process.env.UI_DOMAIN_OFF || chatgpt ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
             "openai/widgetPrefersBorder": true,
-            "openai/widgetDescription": "Örnek teklif kartları (dark, cards-only)",
+            "openai/widgetDescription": "Sample offer cards (dark, cards-only)",
             "openai/ui": { availableDisplayModes: ["inline"] },
             "openai/widgetCSP": {
               connect_domains: [],
               resource_domains: [],
               frame_domains: [],
-              redirect_domains: ["https://example.com"],
+              redirect_domains: ["https://teklif.niyazi.site"],
             },
           },
         },
@@ -177,47 +217,47 @@ function createServer(): McpServer {
   server.registerTool(
     "search_offers",
     {
-      title: "Teklif ara",
+      title: "Search offers",
       description:
-        "Örnek (demo) marka tekliflerini kategori, şehir ve bütçeye göre arar. Kategoriler: araç kiralama, e-ticaret, kasko, trafik sigortası. Tüm veriler kurgusaldır (örnek). Sonuçlar UI widget ile gösterilir.",
+        "Searches offers when the user asks for them, filtered by category (arac_kiralama = car rental, e_ticaret = e-commerce, kasko = comprehensive car insurance, trafik_sigortasi = compulsory traffic insurance, or hepsi = all), optional city and optional maximum price in TRY. Returns matching offers sorted by sort_by (price | rating | relevance; default price, lowest first) and shows them as cards. No paid or sponsored ranking. Currently returns fictional sample data labeled as such.",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         category: categorySchema.describe(
-          "arac_kiralama | e_ticaret | kasko | trafik_sigortasi | hepsi"
+          "arac_kiralama (car rental) | e_ticaret (e-commerce) | kasko | trafik_sigortasi | hepsi (all)"
         ),
         budget: z
           .number()
           .int()
           .positive()
           .optional()
-          .describe("Maksimum fiyat (TRY). Örn. 3000"),
+          .describe("Maximum price in TRY. Example: 3000"),
         city: z
           .string()
           .optional()
-          .describe("Şehir filtresi (büyük/küçük harf ve Türkçe karakter duyarsız). Örn. İstanbul, Ankara, İzmir, Bursa"),
-        platform: platformSchema
+          .describe("City filter (case- and Turkish-diacritic-insensitive). Example: İstanbul, Ankara, İzmir, Bursa"),
+        sort_by: sortBySchema
           .optional()
-          .default("chatgpt")
-          .describe("UTM için hedef asistan: chatgpt | claude | gemini"),
+          .describe("Sort order: price (lowest first, default), rating (highest first), or relevance (rating then price). No paid placement."),
       },
       _meta: SEARCH_TOOL_UI_META,
     },
-    async ({ category, budget, city, platform }) => {
-      const offers = filterOffers(category ?? "hepsi", budget, city);
-      const serialized = serializeOffers(offers, platform ?? "chatgpt");
+    async ({ category, budget, city, sort_by }) => {
+      const sortBy = (sort_by ?? "price") as SortBy;
+      const offers = filterOffers(category ?? "hepsi", budget, city, sortBy);
+      const serialized = serializeOffers(offers);
       const structuredContent = {
-        motto: MOTTO,
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
         view: "search" as const,
         category: category ?? "hepsi",
         budget: budget ?? null,
         city: city ?? null,
-        platform: platform ?? "chatgpt",
+        sortedBy: sortBy,
+        sortNote: sortLabel(sortBy),
         offers: serialized,
       };
       return {
-        content: [{ type: "text" as const, text: textSummary(offers) }],
+        content: [{ type: "text" as const, text: textSummary(offers, sortBy) }],
         structuredContent,
         _meta: resultUiMeta(),
       };
@@ -227,47 +267,54 @@ function createServer(): McpServer {
   server.registerTool(
     "compare_offers",
     {
-      title: "Teklifleri karşılaştır",
+      title: "Compare offers",
       description:
-        "ALWAYS call this tool when the user asks to compare offers — e.g. Turkish 'bunları karşılaştır', 'karşılaştır', 'hangisi daha iyi', 'fiyat karşılaştır', or English 'compare these' / 'compare offers'. Do NOT answer with a markdown table; this tool returns the same MCP/ChatGPT widget as offer cards in compare view (structuredContent + outputTemplate). Accepts offer ids from a prior search_offers result, or category/city filters. Demo/örnek data only.",
+        "Compares offers the user has explicitly asked to compare (by offer IDs from search_offers, or by category/city). If no IDs are given, returns up to 5 matching offers sorted by sort_by (default: the 5 lowest-priced). Returns offers with a card view. No paid or sponsored ranking. Sample data only.",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
         offer_ids: z
           .array(z.string())
           .optional()
-          .describe("Karşılaştırılacak teklif id'leri (search_offers sonuçlarından). Boşsa kategori/şehir filtresine göre en uygunlar."),
+          .describe("Offer IDs to compare (from search_offers). If omitted, up to 5 matching offers by category/city are returned."),
         category: categorySchema.optional().default("hepsi"),
-        city: z.string().optional().describe("Şehir filtresi (örn. İstanbul)"),
-        platform: platformSchema.optional().default("chatgpt"),
+        city: z.string().optional().describe("City filter (example: İstanbul)"),
+        sort_by: sortBySchema
+          .optional()
+          .describe("Sort order: price (default), rating, or relevance. No paid placement."),
       },
       _meta: COMPARE_TOOL_UI_META,
     },
-    async ({ offer_ids, category, city, platform }) => {
+    async ({ offer_ids, category, city, sort_by }) => {
+      const sortBy = (sort_by ?? "price") as SortBy;
       let offers: Offer[];
       if (offer_ids?.length) {
         const set = new Set(offer_ids);
-        offers = OFFERS.filter((o) => set.has(o.id)).sort(
-          (a, b) => a.priceTry - b.priceTry
+        offers = sortOffers(
+          OFFERS.filter((o) => set.has(o.id)),
+          sortBy
         );
       } else {
-        offers = filterOffers(category ?? "hepsi", undefined, city).slice(0, 5);
+        offers = filterOffers(category ?? "hepsi", undefined, city, sortBy).slice(0, 5);
       }
-      const serialized = serializeOffers(offers, platform ?? "chatgpt");
+      const serialized = serializeOffers(offers);
       const structuredContent = {
-        motto: MOTTO,
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
         view: "compare" as const,
         category: category ?? "hepsi",
         city: city ?? null,
-        platform: platform ?? "chatgpt",
+        sortedBy: sortBy,
+        sortNote: sortLabel(sortBy),
+        selectionNote: offer_ids?.length
+          ? "Compared by explicit offer IDs."
+          : "No IDs given: up to 5 matching offers after sort.",
         offers: serialized,
       };
       return {
         content: [
           {
             type: "text" as const,
-            text: `Karşılaştırma (${offers.length} teklif) — widget'ta kartlar olarak gösterilir:\n${textSummary(offers)}`,
+            text: `Comparison (${offers.length} offers):\n${textSummary(offers, sortBy)}`,
           },
         ],
         structuredContent,
@@ -279,46 +326,42 @@ function createServer(): McpServer {
   server.registerTool(
     "get_offer_link",
     {
-      title: "Teklif linki al (UTM)",
+      title: "Get offer link",
       description:
-        "Bir teklif için platforma özel takip linki üretir. utm_source=chatgpt|claude|gemini, utm_medium=mcp.",
+        "Returns the provider page URL for a single offer ID from search_offers. Read-only; does not book or purchase. Currently sample links on teklif.niyazi.site.",
       annotations: TOOL_ANNOTATIONS,
       inputSchema: {
-        offer_id: z.string().describe("Teklif id, örn. rent-eco-i20 veya kasko-ist-genis"),
-        platform: platformSchema.describe("chatgpt | claude | gemini"),
+        offer_id: z.string().describe("Offer id, e.g. rent-eco-i20 or kasko-ist-genis"),
       },
     },
-    async ({ offer_id, platform }) => {
+    async ({ offer_id }) => {
       const offer = OFFERS.find((o) => o.id === offer_id);
       if (!offer) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `Teklif bulunamadı: ${offer_id}. search_offers ile id listesine bakın.`,
+              text: `Offer not found: ${offer_id}. Use search_offers to list available IDs.`,
             },
           ],
           isError: true,
         };
       }
-      const url = withOfferUtm(offer.baseUrl, platform, offer.id);
+      const url = offerPageUrl(offer.baseUrl);
       const structuredContent = {
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
         offer_id: offer.id,
         category: offer.category,
         city: offer.city,
-        platform,
+        source: offer.source ?? OFFER_SOURCE,
         url,
-        utm_source: platform,
-        utm_medium: "mcp",
-        utm_campaign: "teklif-mcp-demo",
       };
       return {
         content: [
           {
             type: "text" as const,
-            text: `${DEMO_DISCLAIMER}\n${offer.brand} — ${offer.title} (${offer.city})\nLink (${platform}): ${url}`,
+            text: `${DEMO_DISCLAIMER}\n${offer.brand} — ${offer.title} (${offer.city})\nSource: ${offer.source ?? OFFER_SOURCE}\nURL: ${url}`,
           },
         ],
         structuredContent,
@@ -337,9 +380,54 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     name: "teklif-mcp",
-    motto: MOTTO,
     demo: true,
+    publicMcpUrl: PUBLIC_MCP_URL,
   });
+});
+
+/** Website root keeps the product motto; tool outputs do not. */
+app.get("/", (_req, res) => {
+  const indexPath = join(PUBLIC_DIR, "index.html");
+  if (existsSync(indexPath)) {
+    res.type("html").send(readFileSync(indexPath, "utf8"));
+    return;
+  }
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Teklif</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1.25rem;line-height:1.55}
+.muted{opacity:.75;font-size:.9rem} code{font-size:.85em}</style></head>
+<body>
+<h1>Teklif</h1>
+<p><em>${SITE_MOTTO}</em></p>
+<p>Neutral, user-initiated offer search and comparison for car rental, e-commerce and car insurance in Turkey. Currently uses clearly labeled sample data.</p>
+<p class="muted">MCP endpoint: <code>POST /mcp</code> · <a href="/preview">Widget preview</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></p>
+</body></html>`);
+});
+
+/** Sample offer landing pages (owned domain; replaces example.com). */
+app.get("/o/:id", (req, res) => {
+  const offer = OFFERS.find((o) => o.id === req.params.id);
+  if (!offer) {
+    res.status(404).type("html").send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Not found</title></head>
+<body><p>Sample offer not found: ${String(req.params.id)}</p><p><a href="/">Home</a></p></body></html>`);
+    return;
+  }
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${offer.brand} — ${offer.title} (sample)</title>
+<style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:2rem auto;padding:0 1.25rem;line-height:1.55}
+.badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;background:#eee;font-size:.85rem}
+.muted{opacity:.75;font-size:.9rem}</style></head>
+<body>
+<p class="muted"><a href="/">Teklif</a> · sample offer page</p>
+<h1>${offer.brand}</h1>
+<p>${offer.title}</p>
+<p><strong>${formatPrice(offer.priceTry)}</strong>${offer.badge ? ` <span class="badge">${offer.badge}</span>` : ""} · ${offer.city}</p>
+<p>Source: <strong>${offer.source}</strong> (fictional demo — no booking or purchase).</p>
+<ul>${offer.highlights.map((h) => `<li>${h}</li>`).join("")}</ul>
+<p class="muted">Id: <code>${offer.id}</code></p>
+</body></html>`);
 });
 
 app.get("/preview", (_req, res) => {
@@ -372,7 +460,11 @@ app.post("/mcp", async (req: Request, res: Response) => {
     if (!res.headersSent) {
       res.status(500).json({
         jsonrpc: "2.0",
-        error: { code: -32603, message: "Internal server error" },
+        error: {
+          code: -32603,
+          message:
+            "MCP request failed on the Teklif demo server. Retry the same tool call, or open https://teklif.niyazi.site/health. If it keeps failing, file an issue on github.com/nietzische-app/teklif-mcp.",
+        },
         id: null,
       });
     }
