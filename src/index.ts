@@ -16,6 +16,7 @@ import { withOfferUtm, type AiPlatform } from "./utm.js";
 import { OFFER_WIDGET_URI, buildOfferWidgetHtml } from "./widgetHtml.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = [join(__dirname, "..", "public"), join(process.cwd(), "public")].find((d) => existsSync(d)) ?? join(__dirname, "..", "public");
 const PORT = Number(process.env.PORT ?? 8787);
 const MOTTO = "Tekliflerinizi her yapay zeka sunsun";
 const UI_MIME = "text/html;profile=mcp-app";
@@ -246,7 +247,7 @@ function createServer(): McpServer {
 
 const app = express();
 app.use(express.json({ limit: "4mb" }));
-app.use(express.static(join(__dirname, "..", "public")));
+app.use(express.static(PUBLIC_DIR));
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -258,7 +259,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/preview", (_req, res) => {
-  const previewPath = join(__dirname, "..", "public", "preview.html");
+  const previewPath = join(PUBLIC_DIR, "preview.html");
   if (!existsSync(previewPath)) {
     res.status(404).send("preview.html missing");
     return;
@@ -310,7 +311,9 @@ app.delete("/mcp", (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+export default app;
+
+if (!process.env.VERCEL) app.listen(PORT, () => {
   console.log(`teklif-mcp listening on http://127.0.0.1:${PORT}`);
   console.log(`  MCP endpoint: POST http://127.0.0.1:${PORT}/mcp`);
   console.log(`  Preview:      http://127.0.0.1:${PORT}/preview`);

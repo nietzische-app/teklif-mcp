@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "functions": { "api/index.js": { "includeFiles": "{dist,public}/**" } },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }]
+}
