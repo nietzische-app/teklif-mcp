@@ -207,43 +207,6 @@
       font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--faint);
     }
-    /* —— COMPARE —— */
-    .compare-wrap {
-      flex: 0 0 auto; overflow: visible;
-      margin: 0 12px; padding: 0;
-      background: var(--bg-elev);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-    }
-    .section-label {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 7px 12px;
-      font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--faint);
-      border-bottom: 1px solid var(--card-border);
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
-    th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--card-border); }
-    th {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--faint);
-    }
-    td { color: var(--text); }
-    td.num { text-align: right; }
-    td.num.best {
-      color: #fff;
-      font-weight: 700;
-    }
-    tr:last-child td { border-bottom: 0; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 2px 8px; border-radius: var(--radius-pill);
-      background: rgba(100,98,243,0.18); color: var(--muted); font-size: 10px;
-    }
-    .chip .dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-    }
     /* —— FOOTER CTA —— */
     .cta-bar {
       flex: 0 0 auto;
@@ -267,20 +230,7 @@
     }
     .cta-btn:hover { filter: brightness(1.05); }
 
-    /* —— COMPARE VIEW (tool: compare_offers) —— */
-    .shell.compare-mode .rail { display: none; }
-    .shell.compare-mode .compare-wrap {
-      margin: 4px 12px 8px;
-      flex: 0 0 auto;
-    }
-    .shell.compare-mode .compare-wrap table { font-size: 12px; }
-    .shell.compare-mode th, .shell.compare-mode td { padding: 8px 12px; }
-    .shell.compare-mode td.num.best {
-      color: #fff;
-      background: linear-gradient(135deg, rgba(100,98,243,0.35), rgba(201,92,225,0.25));
-      border-radius: 8px;
-    }
-    .feat-cell { font-size: 10px; color: var(--muted); max-width: 220px; }
+    /* compare_offers uses the same cards-only layout; pill marks the view */
     .view-pill {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 3px 9px; border-radius: var(--radius-pill);
@@ -333,7 +283,6 @@
       const offers = Array.isArray(payload?.offers) ? payload.offers : [];
       const motto = payload?.motto || "Tekliflerinizi her yapay zeka sunsun";
       const activePlatform = payload?.platform || "ALL";
-      const compare = Array.isArray(payload?.compare) ? payload.compare : offers.slice(0, 4);
       const view = String(payload?.view || "search").toLowerCase() === "compare" ? "compare" : "search";
       const isCompare = view === "compare";
 
@@ -350,7 +299,8 @@
         return '<button type="button" class="' + (active ? "active" : "") + '">' + p + "</button>";
       }).join("");
 
-      const cards = offers.slice(0, 3).map((o) => {
+      const cardLimit = isCompare ? 5 : 4;
+      const cards = offers.slice(0, cardLimit).map((o) => {
         const pct = savePct(o);
         const hot = o.badge && /hot|popüler|premium/i.test(String(o.badge));
         const pillText = hot ? (o.badge || "HOT") : (pct != null ? "-" + pct + "%" : (o.badge || "TEKLİF"));
@@ -376,47 +326,18 @@
         );
       }).join("");
 
-      const byPrice = [...compare].sort((a, b) => (a.priceTry || 0) - (b.priceTry || 0));
-      const bestId = byPrice[0]?.id;
-
-      const rows = compare.map((o) => {
-        const best = o.id === bestId;
-        const pct = savePct(o);
-        const feats = Array.isArray(o.highlights) ? o.highlights.slice(0, 2).join(" · ") : "";
-        return (
-          "<tr>" +
-            '<td><span class="chip"><span class="dot"></span>' + escapeHtml(o.brand.split(" ")[0]) + "</span></td>" +
-            "<td>" + escapeHtml(o.title) + (o.city ? " · " + escapeHtml(o.city) : "") +
-              (isCompare && feats ? '<div class="feat-cell">' + escapeHtml(feats) + "</div>" : "") +
-            "</td>" +
-            '<td class="num' + (best ? " best" : "") + '">' + formatPrice(o.priceTry) + "</td>" +
-            '<td class="num">' + (pct != null ? "-" + pct + "%" : "—") + "</td>" +
-            (isCompare ? '<td class="num">' + (o.rating != null ? Number(o.rating).toFixed(1) : "—") + "</td>" : "") +
-          "</tr>"
-        );
-      }).join("");
-
-      const headCols = isCompare
-        ? "<th>Marka</th><th>Teklif</th><th style='text-align:right'>Şimdi</th><th style='text-align:right'>Δ</th><th style='text-align:right'>Puan</th>"
-        : "<th>Marka</th><th>Teklif</th><th style='text-align:right'>Şimdi</th><th style='text-align:right'>Δ</th>";
-      const sectionTitle = isCompare ? ("Karşılaştırma · " + compare.length + " teklif") : "Karşılaştır";
       const eyebrow = isCompare
-        ? '<div class="eyebrow">Teklif MCP · v9 <span class="view-pill">compare</span></div>'
-        : '<div class="eyebrow">Teklif MCP · v9</div>';
+        ? '<div class="eyebrow">Teklif MCP · v10 <span class="view-pill">compare</span></div>'
+        : '<div class="eyebrow">Teklif MCP · v10</div>';
 
-      app.className = "shell" + (isCompare ? " compare-mode" : "");
+      app.className = "shell";
       app.innerHTML =
         '<div class="hdr">' +
           '<div class="brand-block">' + eyebrow +
           '<div class="title">' + escapeHtml(isCompare ? "Teklifleri karşılaştır" : motto) + ' <span>/ örnek</span></div></div>' +
           '<div class="seg">' + segs + "</div>" +
         "</div>" +
-        (isCompare ? "" : '<div class="rail">' + cards + "</div>") +
-        '<div class="compare-wrap">' +
-          '<div class="section-label"><span>' + sectionTitle + '</span><span>fiyat ↑</span></div>' +
-          "<table><thead><tr>" + headCols + "</tr></thead>" +
-          "<tbody>" + rows + "</tbody></table>" +
-        "</div>" +
+        '<div class="rail">' + cards + "</div>" +
         '<div class="cta-bar">' +
           '<div class="cta-copy"><strong>Her yapay zekada aynı teklifler</strong><span>ChatGPT · Claude · Gemini — tek MCP</span></div>' +
           '<a class="cta-btn" href="https://example.com/demo/teklif-mcp/connect" target="_blank" rel="noopener noreferrer">MCP bağla</a>' +
@@ -521,8 +442,8 @@
     } else if (inHost) {
       if (!rendered) document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
       request("ui/initialize", {
-        appInfo: { name: "teklif-mcp-widget", version: "9.0.0" },
-        clientInfo: { name: "teklif-mcp-widget", version: "9.0.0" },
+        appInfo: { name: "teklif-mcp-widget", version: "10.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "10.0.0" },
         appCapabilities: { availableDisplayModes: ["inline"] },
         protocolVersion: "2026-01-26"
       }).then((res) => {
@@ -541,13 +462,12 @@
       ];
       let view = "search";
       try { view = new URLSearchParams(location.search).get("view") === "compare" ? "compare" : "search"; } catch (_) {}
-      const list = view === "compare" ? demoOffers.slice(0, 4) : demoOffers.slice(0, 3);
+      const list = view === "compare" ? demoOffers.slice(0, 5) : demoOffers.slice(0, 4);
       show({
         motto: "Tekliflerinizi her yapay zeka sunsun",
         platform: "ALL",
         view,
-        offers: list,
-        compare: list
+        offers: list
       });
     }
   </script>

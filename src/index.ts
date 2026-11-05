@@ -131,7 +131,7 @@ function createServer(): McpServer {
     "offers-widget",
     OFFER_WIDGET_URI,
     {
-      description: "Teklif kartı carousel + karşılaştırma tablosu (MCP Apps UI)",
+      description: "Teklif kartı carousel (MCP Apps UI, cards-only)",
       mimeType: UI_MIME,
     },
     async (_uri, extra) => {
@@ -152,7 +152,7 @@ function createServer(): McpServer {
               ...(process.env.UI_DOMAIN_OFF || chatgpt ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
             "openai/widgetPrefersBorder": true,
-            "openai/widgetDescription": "Örnek teklif kartları ve karşılaştırma tablosu (dark)",
+            "openai/widgetDescription": "Örnek teklif kartları (dark, cards-only)",
             "openai/ui": { availableDisplayModes: ["inline"] },
             "openai/widgetCSP": {
               connect_domains: [],
@@ -207,7 +207,6 @@ function createServer(): McpServer {
         city: city ?? null,
         platform: platform ?? "chatgpt",
         offers: serialized,
-        compare: serialized.slice(0, 4),
       };
       return {
         content: [{ type: "text" as const, text: textSummary(offers) }],
@@ -222,7 +221,7 @@ function createServer(): McpServer {
     {
       title: "Teklifleri karşılaştır",
       description:
-        "ALWAYS call this tool when the user asks to compare offers — e.g. Turkish 'bunları karşılaştır', 'karşılaştır', 'hangisi daha iyi', 'fiyat karşılaştır', or English 'compare these' / 'compare offers'. Do NOT answer with a markdown table; this tool returns the same MCP/ChatGPT widget in compare view (structuredContent + outputTemplate). Accepts offer ids from a prior search_offers result, or category/city filters. Demo/örnek data only.",
+        "ALWAYS call this tool when the user asks to compare offers — e.g. Turkish 'bunları karşılaştır', 'karşılaştır', 'hangisi daha iyi', 'fiyat karşılaştır', or English 'compare these' / 'compare offers'. Do NOT answer with a markdown table; this tool returns the same MCP/ChatGPT widget as offer cards in compare view (structuredContent + outputTemplate). Accepts offer ids from a prior search_offers result, or category/city filters. Demo/örnek data only.",
       inputSchema: {
         offer_ids: z
           .array(z.string())
@@ -254,13 +253,12 @@ function createServer(): McpServer {
         city: city ?? null,
         platform: platform ?? "chatgpt",
         offers: serialized,
-        compare: serialized,
       };
       return {
         content: [
           {
             type: "text" as const,
-            text: `Karşılaştırma (${offers.length} teklif) — widget'ta tablo olarak gösterilir:\n${textSummary(offers)}`,
+            text: `Karşılaştırma (${offers.length} teklif) — widget'ta kartlar olarak gösterilir:\n${textSummary(offers)}`,
           },
         ],
         structuredContent,
