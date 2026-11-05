@@ -3,7 +3,7 @@
   "name": "io.github.nietzische-app/teklif-mcp",
   "title": "Teklif",
   "description": "Demo: brand offers (car rental, e-commerce, insurance) for ChatGPT, Claude, Gemini via MCP.",
-  "websiteUrl": "https://teklif-mcp.vercel.app",
+  "websiteUrl": "https://teklif.niyazi.site",
   "repository": {
     "url": "https://github.com/nietzische-app/teklif-mcp",
     "source": "github"
@@ -12,7 +12,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://teklif-mcp.vercel.app/mcp"
+      "url": "https://teklif.niyazi.site/mcp"
     }
   ]
 }
