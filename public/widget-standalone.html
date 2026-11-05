@@ -339,6 +339,7 @@
       return lines.slice(0, 4);
     }
 
+    const CAT_LABEL = { arac_kiralama: "Araç kiralama", e_ticaret: "E-ticaret", kasko: "Kasko", trafik_sigortasi: "Trafik sigortası" };
     function render(payload) {
       const app = document.getElementById("app");
       const offers = Array.isArray(payload?.offers) ? payload.offers : [];
@@ -377,6 +378,7 @@
             '<div class="body">' +
               '<div class="brand">' + escapeHtml(o.brand) + "</div>" +
               '<div class="subtitle">' + escapeHtml(o.title) + "</div>" +
+              '<div class="subtitle">📍 ' + escapeHtml(o.city || "—") + " · " + escapeHtml(CAT_LABEL[o.category] || o.category || "") + "</div>" +
               '<a class="card-cta" href="' + escapeAttr(href) + '" target="_blank" rel="noopener noreferrer">Teklifi aç</a>' +
               '<ul class="feats">' + feats + '</ul>' +
             "</div>" +
@@ -393,7 +395,7 @@
         return (
           "<tr>" +
             '<td><span class="chip"><span class="dot"></span>' + escapeHtml(o.brand.split(" ")[0]) + "</span></td>" +
-            "<td>" + escapeHtml(o.title) + "</td>" +
+            "<td>" + escapeHtml(o.title) + (o.city ? " · " + escapeHtml(o.city) : "") + "</td>" +
             '<td class="num' + (best ? " best" : "") + '">' + formatPrice(o.priceTry) + "</td>" +
             '<td class="num">' + (pct != null ? "-" + pct + "%" : "—") + "</td>" +
           "</tr>"
@@ -402,7 +404,7 @@
 
       app.innerHTML =
         '<div class="hdr">' +
-          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v5</div>' +
+          '<div class="brand-block"><div class="eyebrow">Teklif MCP · v6</div>' +
           '<div class="title">' + escapeHtml(motto) + ' <span>/ örnek</span></div></div>' +
           '<div class="seg">' + segs + "</div>" +
         "</div>" +
@@ -438,37 +440,76 @@
       return null;
     }
 
+    // ---- MCP Apps bridge (SEP-1865, protocol 2026-01-26) ----
+    const inHost = window.parent && window.parent !== window;
+    let rpcId = 1;
+    const pending = {};
+    function post(msg) { try { window.parent.postMessage(msg, "*"); } catch (_) {} }
+    function request(method, params) {
+      const id = rpcId++;
+      post({ jsonrpc: "2.0", id, method, params });
+      return new Promise((resolve) => { pending[id] = resolve; setTimeout(() => { if (pending[id]) { delete pending[id]; resolve(null); } }, 8000); });
+    }
+    function notify(method, params) { post({ jsonrpc: "2.0", method, params }); }
+    let rendered = false;
+    function show(sc) { if (sc) { rendered = true; render(sc); reportSize(); } }
+
     window.addEventListener("message", (event) => {
       const data = event.data;
       if (!data) return;
+      if (data.jsonrpc === "2.0" && data.id != null && pending[data.id] && !data.method) {
+        const r = pending[data.id]; delete pending[data.id]; r(data.result ?? null); return;
+      }
       if (data.jsonrpc === "2.0" && data.method === "ui/notifications/tool-result") {
-        const sc = pickStructured(data.params) || pickStructured(data);
-        if (sc) render(sc);
-        return;
+        show(pickStructured(data.params) || pickStructured(data)); return;
       }
-      if (data.type === "teklif-mcp/preview" && data.payload) {
-        render(data.payload);
+      if (data.jsonrpc === "2.0" && data.method === "ui/resource-teardown" && data.id != null) {
+        post({ jsonrpc: "2.0", id: data.id, result: {} }); return;
       }
+      if (data.type === "teklif-mcp/preview" && data.payload) show(data.payload);
     });
 
-    try {
-      if (window.openai?.toolOutput) {
-        const sc = pickStructured(window.openai.toolOutput) || window.openai.toolOutput;
-        if (sc) render(sc);
-      }
-    } catch (_) {}
+    function reportSize() {
+      if (!inHost) return;
+      const el = document.documentElement;
+      notify("ui/notifications/size-changed", { width: Math.ceil(el.scrollWidth), height: Math.ceil(el.scrollHeight) });
+    }
+    try { new ResizeObserver(reportSize).observe(document.body); } catch (_) {}
+
+    // Links: ask host to open (sandboxed iframes may block target=_blank)
+    document.addEventListener("click", (e) => {
+      const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a || !inHost) return;
+      e.preventDefault();
+      const url = a.getAttribute("href");
+      if (window.openai?.openExternal) { try { window.openai.openExternal({ href: url }); return; } catch (_) {} }
+      request("ui/open-link", { url });
+    });
+
+    // ChatGPT compatibility: window.openai.toolOutput
+    try { if (window.openai?.toolOutput) show(pickStructured(window.openai.toolOutput) || window.openai.toolOutput); } catch (_) {}
+    window.addEventListener("openai:set_globals", () => {
+      try { if (window.openai?.toolOutput) show(pickStructured(window.openai.toolOutput) || window.openai.toolOutput); } catch (_) {}
+    });
 
     if (window.__TEKLIF_PREVIEW__) {
-      render(window.__TEKLIF_PREVIEW__);
+      show(window.__TEKLIF_PREVIEW__);
+    } else if (inHost) {
+      document.getElementById("app").innerHTML = '<div class="empty">teklifler yükleniyor…</div>';
+      request("ui/initialize", {
+        appInfo: { name: "teklif-mcp-widget", version: "6.0.0" },
+        clientInfo: { name: "teklif-mcp-widget", version: "6.0.0" },
+        appCapabilities: { availableDisplayModes: ["inline"] },
+        protocolVersion: "2026-01-26"
+      }).then(() => { notify("ui/notifications/initialized", {}); reportSize(); });
     } else {
-      render({
+      show({
         motto: "Tekliflerinizi her yapay zeka sunsun",
         platform: "ALL",
         offers: [
-          { id: "rent-eco-i20", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", rating: 4.8, trackedUrl: "https://example.com/demo/anadoludrive/i20" },
-          { id: "rent-suv-tucson", brand: "AnadoluDrive (örnek)", title: "Hyundai Tucson — SUV günlük", priceTry: 2490, wasPriceTry: 2990, badge: "HOT", rating: 4.6, trackedUrl: "https://example.com/demo/anadoludrive/tucson" },
-          { id: "shop-robot-vacuum", brand: "Nodify Market (örnek)", title: "Robot süpürge X200 — Demo", priceTry: 6499, wasPriceTry: 7999, badge: "-19%", rating: 4.5, trackedUrl: "https://example.com/demo/nodify/robot-x200" },
-          { id: "shop-espresso", brand: "KahveKöşk (örnek)", title: "Espresso makinesi Barista Mini", priceTry: 4290, wasPriceTry: 5050, badge: "%15", rating: 4.7, trackedUrl: "https://example.com/demo/kahvekosk/barista-mini" }
+          { id: "kasko-ist-genis", city: "İstanbul", category: "kasko", brand: "Kalkan Sigorta (örnek)", title: "Genişletilmiş Kasko — Yıllık", priceTry: 18900, wasPriceTry: 22400, badge: "-16%", trackedUrl: "https://example.com/demo/kasko-ist-genis" },
+          { id: "rent-eco-i20", city: "İstanbul", category: "arac_kiralama", brand: "AnadoluDrive (örnek)", title: "Hyundai i20 — Günlük kiralama", priceTry: 1290, wasPriceTry: 1790, badge: "-28%", trackedUrl: "https://example.com/demo/anadoludrive/i20" },
+          { id: "shop-espresso", city: "İzmir", category: "e_ticaret", brand: "KahveKöşk (örnek)", title: "Espresso makinesi Barista Mini", priceTry: 4290, wasPriceTry: 5050, badge: "%15", trackedUrl: "https://example.com/demo/kahvekosk/barista-mini" }
         ]
       });
     }

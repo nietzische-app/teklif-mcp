@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,7 @@ import {
   DEMO_DISCLAIMER,
   OFFERS,
   formatPrice,
+  normalizeText,
   type Offer,
   type OfferCategory,
 } from "./data.js";
@@ -20,15 +22,31 @@ const PUBLIC_DIR = [join(__dirname, "..", "public"), join(process.cwd(), "public
 const PORT = Number(process.env.PORT ?? 8787);
 const MOTTO = "Tekliflerinizi her yapay zeka sunsun";
 const UI_MIME = "text/html;profile=mcp-app";
+/** Public connector URL; Claude validates ui.domain = sha256(url)[:32] + ".claudemcpcontent.com" */
+const PUBLIC_MCP_URL = process.env.PUBLIC_MCP_URL ?? "https://teklif-mcp.vercel.app/mcp";
+const CLAUDE_UI_DOMAIN =
+  createHash("sha256").update(PUBLIC_MCP_URL).digest("hex").slice(0, 32) + ".claudemcpcontent.com";
+const TOOL_UI_META = {
+  ui: { resourceUri: OFFER_WIDGET_URI, visibility: ["model", "app"] },
+  // legacy flat key (deprecated in spec, still read by some hosts)
+  "ui/resourceUri": OFFER_WIDGET_URI,
+  // ChatGPT Apps SDK compatibility alias
+  "openai/outputTemplate": OFFER_WIDGET_URI,
+  "openai/widgetAccessible": true,
+  "openai/toolInvocation/invoking": "Teklifler aranıyor…",
+  "openai/toolInvocation/invoked": "Teklifler hazır",
+};
 
-const categorySchema = z.enum(["arac_kiralama", "e_ticaret", "hepsi"]).default("hepsi");
+const categorySchema = z.enum(["arac_kiralama", "e_ticaret", "kasko", "trafik_sigortasi", "hepsi"]).default("hepsi");
 const platformSchema = z.enum(["chatgpt", "claude", "gemini"]);
 
-function filterOffers(category: z.infer<typeof categorySchema>, budget?: number): Offer[] {
+function filterOffers(category: z.infer<typeof categorySchema>, budget?: number, city?: string): Offer[] {
+  const c = city ? normalizeText(city) : "";
   return OFFERS.filter((o) => {
     const catOk = category === "hepsi" || o.category === (category as OfferCategory);
     const budgetOk = budget == null || o.priceTry <= budget;
-    return catOk && budgetOk;
+    const cityOk = !c || normalizeText(o.city) === c;
+    return catOk && budgetOk && cityOk;
   }).sort((a, b) => a.priceTry - b.priceTry);
 }
 
@@ -38,6 +56,7 @@ function serializeOffers(offers: Offer[], platform: AiPlatform = "chatgpt") {
     brand: o.brand,
     title: o.title,
     category: o.category,
+    city: o.city,
     priceTry: o.priceTry,
     wasPriceTry: o.wasPriceTry ?? null,
     priceLabel: formatPrice(o.priceTry),
@@ -59,7 +78,7 @@ function textSummary(offers: Offer[]): string {
   }
   const lines = offers.map(
     (o, i) =>
-      `${i + 1}. [${o.badge ?? "Teklif"}] ${o.brand} — ${o.title}: ${formatPrice(o.priceTry)} (${o.id})`
+      `${i + 1}. [${o.badge ?? "Teklif"}] ${o.brand} — ${o.title} [${o.city}]: ${formatPrice(o.priceTry)} (${o.id})`
   );
   return `${DEMO_DISCLAIMER}\n${MOTTO}\n\n${lines.join("\n")}`;
 }
@@ -94,7 +113,11 @@ function createServer(): McpServer {
           _meta: {
             ui: {
               prefersBorder: true,
+              csp: { connectDomains: [], resourceDomains: [] },
+              ...(process.env.UI_DOMAIN_OFF ? {} : { domain: CLAUDE_UI_DOMAIN }),
             },
+            "openai/widgetPrefersBorder": true,
+            "openai/widgetDescription": "Örnek teklif kartları ve karşılaştırma tablosu",
           },
         },
       ],
@@ -106,10 +129,10 @@ function createServer(): McpServer {
     {
       title: "Teklif ara",
       description:
-        "Örnek (demo) marka tekliflerini kategori ve bütçeye göre arar. Türkçe araç kiralama + e-ticaret örnek verisi. Sonuçlar UI widget ile gösterilebilir.",
+        "Örnek (demo) marka tekliflerini kategori, şehir ve bütçeye göre arar. Kategoriler: araç kiralama, e-ticaret, kasko, trafik sigortası. Tüm veriler kurgusaldır (örnek). Sonuçlar UI widget ile gösterilir.",
       inputSchema: {
         category: categorySchema.describe(
-          "arac_kiralama | e_ticaret | hepsi"
+          "arac_kiralama | e_ticaret | kasko | trafik_sigortasi | hepsi"
         ),
         budget: z
           .number()
@@ -117,18 +140,19 @@ function createServer(): McpServer {
           .positive()
           .optional()
           .describe("Maksimum fiyat (TRY). Örn. 3000"),
+        city: z
+          .string()
+          .optional()
+          .describe("Şehir filtresi (büyük/küçük harf ve Türkçe karakter duyarsız). Örn. İstanbul, Ankara, İzmir, Bursa"),
         platform: platformSchema
           .optional()
           .default("chatgpt")
           .describe("UTM için hedef asistan: chatgpt | claude | gemini"),
       },
-      _meta: {
-        ui: { resourceUri: OFFER_WIDGET_URI },
-        "openai/outputTemplate": OFFER_WIDGET_URI,
-      },
+      _meta: TOOL_UI_META,
     },
-    async ({ category, budget, platform }) => {
-      const offers = filterOffers(category ?? "hepsi", budget);
+    async ({ category, budget, city, platform }) => {
+      const offers = filterOffers(category ?? "hepsi", budget, city);
       const serialized = serializeOffers(offers, platform ?? "chatgpt");
       const structuredContent = {
         motto: MOTTO,
@@ -136,6 +160,8 @@ function createServer(): McpServer {
         isDemo: true,
         category: category ?? "hepsi",
         budget: budget ?? null,
+        city: city ?? null,
+        platform: platform ?? "chatgpt",
         offers: serialized,
         compare: serialized.slice(0, 4),
       };
@@ -158,14 +184,12 @@ function createServer(): McpServer {
           .optional()
           .describe("Karşılaştırılacak teklif id'leri. Boşsa kategoriye göre en ucuzlar."),
         category: categorySchema.optional().default("hepsi"),
+        city: z.string().optional().describe("Şehir filtresi (örn. İstanbul)"),
         platform: platformSchema.optional().default("chatgpt"),
       },
-      _meta: {
-        ui: { resourceUri: OFFER_WIDGET_URI },
-        "openai/outputTemplate": OFFER_WIDGET_URI,
-      },
+      _meta: TOOL_UI_META,
     },
-    async ({ offer_ids, category, platform }) => {
+    async ({ offer_ids, category, city, platform }) => {
       let offers: Offer[];
       if (offer_ids?.length) {
         const set = new Set(offer_ids);
@@ -173,13 +197,14 @@ function createServer(): McpServer {
           (a, b) => a.priceTry - b.priceTry
         );
       } else {
-        offers = filterOffers(category ?? "hepsi").slice(0, 5);
+        offers = filterOffers(category ?? "hepsi", undefined, city).slice(0, 5);
       }
       const serialized = serializeOffers(offers, platform ?? "chatgpt");
       const structuredContent = {
         motto: MOTTO,
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
+        platform: platform ?? "chatgpt",
         offers: serialized,
         compare: serialized,
       };
@@ -202,7 +227,7 @@ function createServer(): McpServer {
       description:
         "Bir teklif için platforma özel takip linki üretir. utm_source=chatgpt|claude|gemini, utm_medium=mcp.",
       inputSchema: {
-        offer_id: z.string().describe("Teklif id, örn. rent-eco-i20"),
+        offer_id: z.string().describe("Teklif id, örn. rent-eco-i20 veya kasko-ist-genis"),
         platform: platformSchema.describe("chatgpt | claude | gemini"),
       },
     },
@@ -224,6 +249,8 @@ function createServer(): McpServer {
         disclaimer: DEMO_DISCLAIMER,
         isDemo: true,
         offer_id: offer.id,
+        category: offer.category,
+        city: offer.city,
         platform,
         url,
         utm_source: platform,
@@ -234,7 +261,7 @@ function createServer(): McpServer {
         content: [
           {
             type: "text" as const,
-            text: `${DEMO_DISCLAIMER}\n${offer.brand} — ${offer.title}\nLink (${platform}): ${url}`,
+            text: `${DEMO_DISCLAIMER}\n${offer.brand} — ${offer.title} (${offer.city})\nLink (${platform}): ${url}`,
           },
         ],
         structuredContent,
